@@ -83,19 +83,6 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
         }
     }
 
-//    fun deleteItem(item: Item) {
-//        viewModelScope.launch {
-//            Log.d("ViewModel", "Deleting item ${item.id}")
-//            _uiState.value = _uiState.value.copy(
-//                lastDeletedItem = item,
-//                showUndoSnackbar = true
-//            )
-//            repository.deleteItem(item)
-//            Log.d("ViewModel", "Item deleted, fetching updated list")
-//            getAllItems()
-//        }
-//    }
-
     fun undoDelete() {
         viewModelScope.launch {
             _uiState.value.lastDeletedItem?.let { deletedItem ->
@@ -127,21 +114,6 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
             Log.d("ViewModel", "Cleared restoration key for item $itemId")
         }
     }
-
-//    fun undoDelete() {
-//        viewModelScope.launch {
-//            val itemId = _uiState.value.lastDeletedItem?.id
-//            Log.d("ViewModel", "Undoing delete for item $itemId")
-//            _uiState.value.lastDeletedItem?.let { deletedItem ->
-//                repository.insertItem(deletedItem)
-//                _uiState.value = _uiState.value.copy(
-//                    lastDeletedItem = null,
-//                    showUndoSnackbar = false
-//                )
-//                getAllItems()
-//            }
-//        }
-//    }
 
     fun dismissUndoSnackbar() {
         _uiState.value = _uiState.value.copy(
