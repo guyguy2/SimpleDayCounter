@@ -4,7 +4,7 @@ import androidx.room.Room
 import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.ui.screens.ViewModel
+import com.happypuppy.daycounter.ui.screens.EventViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.dsl.module
@@ -30,7 +30,7 @@ val appModule = module {
     single { ItemRepository(get()) }
 
     // ViewModel
-    viewModelOf(::ViewModel)
+    viewModelOf(::EventViewModel)
 
     single { DataStoreManager(androidContext()) }
 }

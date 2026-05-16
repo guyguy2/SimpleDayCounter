@@ -107,7 +107,7 @@ data class FilterState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(navController: NavHostController, viewModel: ViewModel = koinViewModel()) {
+fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koinViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -582,7 +582,7 @@ fun SwipeToDeleteItem(
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
-    val viewModel = koinViewModel<ViewModel>()
+    val viewModel = koinViewModel<EventViewModel>()
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val dataStoreManager = koinInject<DataStoreManager>()
