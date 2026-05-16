@@ -1,15 +1,11 @@
 package com.happypuppy.daycounter.util
 
-import android.annotation.SuppressLint
-import java.util.concurrent.TimeUnit
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.os.Build
 import androidx.compose.ui.graphics.Color
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 /**
  * Utility class to get app version information without direct BuildConfig dependency
@@ -63,25 +59,6 @@ object AppVersionInfo {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
     }
-}
-
-@SuppressLint("DefaultLocale")
-fun formatTime(seconds: Int): String {
-    val minutes = TimeUnit.SECONDS.toMinutes(seconds.toLong())
-    val remainingSeconds = seconds - TimeUnit.MINUTES.toSeconds(minutes)
-    return String.format("%02d:%02d", minutes, remainingSeconds)
-}
-
-fun formatDateToString(date: String): String {
-    // Define the desired date format pattern.
-    val pattern = "yyyy-MM-dd HH:mm:ss"
-
-    // Create a SimpleDateFormat instance with the specified pattern and locale.
-    // Using a specific locale (e.g., Locale.getDefault()) ensures consistent formatting across different devices.
-    val dateFormat = SimpleDateFormat(pattern, Locale.getDefault())
-
-    // Format the Date object into a String.
-    return dateFormat.format(date)
 }
 
 fun calculateDaysLeft(targetDate: Date): Int {
