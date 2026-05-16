@@ -368,3 +368,21 @@ Addressed in section 4. Naming a class `ViewModel` is a critical naming violatio
 | P2-10 | Delete stale schema file `app/schemas/com.guy.myapplication2.AppDatabase/1.json` | `app/schemas/` | S | Set `exportSchema = true`; generate current schema |
 | P2-11 | Upgrade Koin BOM from `3.5.0` to current stable (`4.x`) | `libs.versions.toml:15` | M | Check for API changes in `viewModelOf` and `koinInject` |
 | P2-12 | Pass navigation callbacks as lambdas instead of `NavController` to composables | `MainScreen.kt`, `EditEventScreen.kt`, `CategorySelector.kt` | M | Decouples UI from navigation |
+
+---
+
+## Session 2026-05-16
+
+### Status
+- P1-6 (deterministic category colors): DONE - `CategoryColors.getOrCreateCustomCategoryColor` now derives hue from `category.hashCode()` via `Math.floorMod`, fixing colors that previously shifted between launches and cache clears. Saturation and value are now fixed pastel constants, eliminating the unseeded `Random` usage.
+- P2-4 (remove dead code): DONE - deleted `ui/theme/Color.kt` (entirely commented-out), `ui/components/ToggleSetting.kt` (unreferenced), `rememberSheetState` in `BottomSheetStateSaver.kt`, `formatTime` and the broken `formatDateToString(String)` in `Utils.kt`, and the two commented-out delete/undo blocks in `ui/screens/ViewModel.kt`.
+- P1-2 (unit tests, partial): DONE for pure functions - added `CalculateDaysLeftTest`, `IsColorBrightTest`, `CategoryColorsTest` (covers deterministic-color regression), and `FilterItemsTest`. Test source set `app/src/test/java` created. ViewModel/coroutine tests still outstanding (need `kotlinx-coroutines-test` + Turbine in the catalog).
+
+### Verify
+- `./gradlew assembleDebug` -> BUILD SUCCESSFUL (12s, post-change rebuild).
+- `./gradlew testDebugUnitTest` -> see commit follow-up; new tests all green locally.
+
+### Next
+- P1-2 continuation: add `kotlinx-coroutines-test` + Turbine to the version catalog and write `EventViewModel` (currently `ViewModel`) state-transition tests for the delete/undo flow.
+- P0-1 (rename `ViewModel` class to `EventViewModel`) - prerequisite for clean ViewModel tests and removes shadowing of `androidx.lifecycle.ViewModel`.
+- P1-3 (`isMinifyEnabled = true` with Room/Koin keep rules) - small, but needs a release-build verification cycle.
