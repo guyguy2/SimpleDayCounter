@@ -20,7 +20,7 @@ data class MainScreenUiState(
     val restoredItemKeys: Map<Int, Long> = mapOf() // Map of item ID to a timestamp "key"
 )
 
-class ViewModel(private val repository: ItemRepository) : ViewModel() {
+class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> get() = _uiState
 
@@ -67,7 +67,7 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
     fun deleteItem(item: Item) {
         viewModelScope.launch {
             // Update UI state immediately
-            Log.d("ViewModel", "Deleting item ${item.id}")
+            Log.d(TAG, "Deleting item ${item.id}")
             _uiState.value = _uiState.value.copy(
                 lastDeletedItem = item,
                 showUndoSnackbar = true
@@ -78,7 +78,7 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
 
             // Then update database
             repository.deleteItem(item)
-            Log.d("ViewModel", "Item deleted, fetching updated list")
+            Log.d(TAG, "Item deleted, fetching updated list")
             getAllItems()
         }
     }
@@ -86,7 +86,7 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
     fun undoDelete() {
         viewModelScope.launch {
             _uiState.value.lastDeletedItem?.let { deletedItem ->
-                Log.d("ViewModel", "Undoing delete for item ${deletedItem.id}")
+                Log.d(TAG, "Undoing delete for item ${deletedItem.id}")
 
                 // Create a new map with this item's unique restoration key (current time)
                 val updatedRestoredKeys = _uiState.value.restoredItemKeys.toMutableMap()
@@ -111,7 +111,7 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
             val currentKeys = _uiState.value.restoredItemKeys.toMutableMap()
             currentKeys.remove(itemId)
             _uiState.value = _uiState.value.copy(restoredItemKeys = currentKeys)
-            Log.d("ViewModel", "Cleared restoration key for item $itemId")
+            Log.d(TAG, "Cleared restoration key for item $itemId")
         }
     }
 
@@ -127,5 +127,9 @@ class ViewModel(private val repository: ItemRepository) : ViewModel() {
             repository.deleteAllItems()
             getAllItems()
         }
+    }
+
+    private companion object {
+        private const val TAG = "EventViewModel"
     }
 }
