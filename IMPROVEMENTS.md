@@ -386,3 +386,19 @@ Addressed in section 4. Naming a class `ViewModel` is a critical naming violatio
 - P1-2 continuation: add `kotlinx-coroutines-test` + Turbine to the version catalog and write `EventViewModel` (currently `ViewModel`) state-transition tests for the delete/undo flow.
 - P0-1 (rename `ViewModel` class to `EventViewModel`) - prerequisite for clean ViewModel tests and removes shadowing of `androidx.lifecycle.ViewModel`.
 - P1-3 (`isMinifyEnabled = true` with Room/Koin keep rules) - small, but needs a release-build verification cycle.
+
+---
+
+## Session 2026-05-16 - Wave 2
+
+### Status
+- P0-1 (rename `ViewModel` class to `EventViewModel`): DONE - file `ui/screens/ViewModel.kt` renamed to `ui/screens/EventViewModel.kt` via `git mv`; class renamed `ViewModel` -> `EventViewModel`; Koin binding in `di/AppModule.kt` updated to `viewModelOf(::EventViewModel)`; `MainScreen.kt` updated at the two call sites (parameter type on `MainScreen` and the explicit `koinViewModel<EventViewModel>()` inside `SwipeToDeleteItem`). `Log.d` tags switched from the hardcoded `"ViewModel"` string to a `TAG = "EventViewModel"` companion constant. No other files referenced the class. Removes the import-shadowing of `androidx.lifecycle.ViewModel` and unblocks clean ViewModel tests.
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest` -> BUILD SUCCESSFUL (1m 9s).
+- Test counts unchanged: `CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7 = 24/24 green.
+- `./gradlew lintDebug` -> 1 error (pre-existing `Instantiatable` false-positive on `MainActivity` from before the rename), 68 warnings. Not introduced by this change.
+
+### Next
+- P1-2 continuation: add `kotlinx-coroutines-test` + Turbine to `libs.versions.toml` and write `EventViewModelTest` covering `deleteItem` -> snackbar/lastDeletedItem state, `undoDelete` -> restoredItemKeys map, and `clearRestorationKey` cleanup. Will need a fake `ItemRepository`.
+- P1-3 (`isMinifyEnabled = true` with Room/Koin keep rules) - now safe to attempt once ViewModel tests exist as a regression net.
