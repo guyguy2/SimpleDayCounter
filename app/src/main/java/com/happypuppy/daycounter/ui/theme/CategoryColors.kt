@@ -1,7 +1,6 @@
 package com.happypuppy.daycounter.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import kotlin.random.Random
 
 /**
  * Predefined colors for default categories
@@ -23,7 +22,7 @@ object CategoryColors {
         "Finance" to Color(0xFFFFE082)   // Dark Amber
     )
 
-    // Store custom category colors
+    // Cache for derived custom category colors (deterministic per name).
     private val customCategoryColors = mutableMapOf<String, Pair<Color, Color>>()
 
     /**
@@ -43,23 +42,29 @@ object CategoryColors {
     }
 
     /**
-     * Get or create a custom category color
+     * Get or create a custom category color.
+     *
+     * Colors are derived deterministically from the category name so they stay
+     * stable across app launches and cache clears. The hue comes from the string
+     * hash mapped onto [0, 360); saturation/value live in a fixed pastel band.
      *
      * @param category The category name
      * @return A pair of (light theme color, dark theme color)
      */
     private fun getOrCreateCustomCategoryColor(category: String): Pair<Color, Color> {
         return customCategoryColors.getOrPut(category) {
-            // Generate random pastel color for light theme
-            val hue = Random.nextFloat() * 360f
-            val lightSaturation = 0.5f + Random.nextFloat() * 0.3f // 0.5-0.8
-            val lightValue = 0.85f + Random.nextFloat() * 0.1f    // 0.85-0.95
+            // Derive a stable hue in [0, 360) from the category name. Using
+            // Math.floorMod keeps the result non-negative for any hash value.
+            val hue = Math.floorMod(category.hashCode(), 360).toFloat()
 
+            // Fixed pastel band so colors stay readable and consistent.
+            val lightSaturation = 0.65f
+            val lightValue = 0.9f
             val lightColor = Color.hsl(hue, lightSaturation, lightValue)
 
-            // Create a darker version for dark theme
-            val darkSaturation = lightSaturation + 0.05f
-            val darkValue = lightValue - 0.3f
+            // Slightly more saturated, noticeably darker variant for dark theme.
+            val darkSaturation = 0.7f
+            val darkValue = 0.6f
             val darkColor = Color.hsl(hue, darkSaturation, darkValue)
 
             Pair(lightColor, darkColor)
@@ -67,8 +72,11 @@ object CategoryColors {
     }
 
     /**
-     * Clears the cached custom colors
-     * Should be called when app is closed to prevent memory leaks
+     * Clears the cached custom colors.
+     *
+     * Colors are derived deterministically from the category name, so clearing
+     * the cache only frees memory; the next lookup will reproduce the same
+     * colors.
      */
     fun clearCustomColorCache() {
         customCategoryColors.clear()
