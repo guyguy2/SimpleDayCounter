@@ -467,3 +467,23 @@ Addressed in section 4. Naming a class `ViewModel` is a critical naming violatio
 - P0-3 (DAO `Flow<List<Item>>` conversion) remains the highest-value next task.
 - Optional: drop `CHANGES_2026-05-16.md` and `CHANGES_2026-05-17.md` once the IMPROVEMENTS.md entries above are considered the canonical changelog. Left in place this wave since both files predate this agent's involvement.
 
+---
+
+## Session 2026-05-17 - Wave 7
+
+### Status
+- P0-3 (DAO `Flow<List<Item>>` + drop polling sites): DONE. `ItemDao.getAllItems()` flipped from `suspend fun ... List<Item>` to `fun ... Flow<List<Item>>` so Room emits a fresh list on every underlying table change. `ItemRepository.getAllItems()` now forwards the flow (no longer `suspend`). `EventViewModel` collects the flow once in a new private `observeItems()` helper kicked off from `init`; the five manual `getAllItems()` re-fetch calls in `saveItem`, `updateItem`, `deleteItem`, `undoDelete`, and `deleteAllItems` are removed. Initial state is `isLoading = true`, flipped to `false` on the first Flow emission (or via `.catch` -> `error`). `FakeItemDao` now backs its items with a `MutableStateFlow` so mutations re-emit synchronously under `UnconfinedTestDispatcher`. The existing 8 `EventViewModelTest` cases all still pass unchanged - the optimistic snackbar update still fires before `delay(200)`, and the post-delay `repository.deleteItem` mutation drives the items list to empty via the Flow.
+- P2-6 (`Log.d` `BuildConfig.DEBUG` guards): DONE. All 28 `Log.d` call sites across 10 files now sit behind `if (BuildConfig.DEBUG)` so R8 strips the calls (and their string templates) from release builds. Required enabling `buildFeatures.buildConfig = true` in `app/build.gradle.kts` since AGP 8 leaves `BuildConfig` generation off by default. `Log.e` sites are deliberately left unguarded (errors should still ship to production logcat).
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest --no-daemon` -> `BUILD SUCCESSFUL in 22s` after the P2-6 commit (28s after the P0-3 commit). 32/32 tests green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8 - same coverage as wave 6; the existing assertions hold under the new reactive update model).
+- `assembleRelease` not re-run this wave (no behavioral change to R8 keep rules or shrink config; the `BuildConfig.DEBUG` guard pattern is a standard R8-friendly idiom).
+
+### Next
+- Smoke-install the R8 release APK on a physical device (carried over from waves 4-6).
+- P1-1 (`koinInject`/`koinViewModel` in leaf composables) - `EventCard`, `SwipeToDeleteItem`, `CategorySelector`, `AddCategoryInput` all reach into Koin directly. Hoist to screen level and pass parameters; unblocks `@Preview` and removes Koin coupling from components.
+- P1-5 (theme resolution duplicated across `EventCard`, `CategorySelector`, `CategoryManagementScreen`) - hoist to a `CompositionLocal` or to `SimpleDayCounterTheme`.
+- P2-7 (type-safe Compose Navigation) - replace string-based routes with `@Serializable` objects so transitions stop string-matching.
+- Once a v5 schema change is on the roadmap: write `Migration(4, 5)`, add `room-testing` to `androidTest`, and remove `fallbackToDestructiveMigration` from `di/AppModule.kt:22`.
+
+
