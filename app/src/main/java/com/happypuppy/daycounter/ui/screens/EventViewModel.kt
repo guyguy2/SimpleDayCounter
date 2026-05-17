@@ -8,6 +8,7 @@ import com.happypuppy.daycounter.data.database.ItemRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -21,11 +22,26 @@ data class MainScreenUiState(
 )
 
 class EventViewModel(private val repository: ItemRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow(MainScreenUiState())
+    private val _uiState = MutableStateFlow(MainScreenUiState(isLoading = true))
     val uiState: StateFlow<MainScreenUiState> get() = _uiState
 
     init {
-        getAllItems()
+        observeItems()
+    }
+
+    // Collect the reactive items stream once. Room emits a fresh list on every
+    // underlying table change, so mutations (insert/delete/etc.) no longer need
+    // to manually re-fetch.
+    private fun observeItems() {
+        viewModelScope.launch {
+            repository.getAllItems()
+                .catch { e ->
+                    _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+                }
+                .collect { items ->
+                    _uiState.value = _uiState.value.copy(items = items, isLoading = false)
+                }
+        }
     }
 
     // Function to create a new item with emoji support
@@ -40,7 +56,6 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                     emoji = emoji
                 )
             )
-            getAllItems()
         }
     }
 
@@ -48,19 +63,6 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     fun updateItem(item: Item) {
         viewModelScope.launch {
             repository.insertItem(item) // Uses Room's REPLACE strategy to update existing item
-            getAllItems()
-        }
-    }
-
-    fun getAllItems() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            try {
-                val items = repository.getAllItems()
-                _uiState.value = _uiState.value.copy(items = items, isLoading = false)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
-            }
         }
     }
 
@@ -76,10 +78,9 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
             // Small delay to ensure animations complete
             delay(200)
 
-            // Then update database
+            // Then update database; the items Flow will emit the new list.
             repository.deleteItem(item)
             Log.d(TAG, "Item deleted, fetching updated list")
-            getAllItems()
         }
     }
 
@@ -99,9 +100,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                     restoredItemKeys = updatedRestoredKeys
                 )
 
-                // Insert the item back to the database
+                // Insert the item back to the database; the Flow will emit.
                 repository.insertItem(deletedItem)
-                getAllItems()
             }
         }
     }
@@ -125,7 +125,6 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     fun deleteAllItems() {
         viewModelScope.launch {
             repository.deleteAllItems()
-            getAllItems()
         }
     }
 
