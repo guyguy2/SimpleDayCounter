@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.happypuppy.daycounter.BuildConfig
 
 /**
  * A custom saver for bottom sheet state that preserves sheet visibility across configuration changes
@@ -26,11 +27,11 @@ fun rememberSaveableSheetState(key: String, initialValue: Boolean = false): Pair
     val sheetVisible = rememberSaveable(saver = BottomSheetStateSaver()) { mutableStateOf(initialValue) }
 
     LaunchedEffect(key) {
-        Log.d("BottomSheet", "Sheet '$key' initialized with state: ${sheetVisible.value}")
+        if (BuildConfig.DEBUG) Log.d("BottomSheet", "Sheet '$key' initialized with state: ${sheetVisible.value}")
     }
 
     val setSheetVisible: (Boolean) -> Unit = { newValue ->
-        Log.d("BottomSheet", "Sheet '$key' state changing from ${sheetVisible.value} to $newValue")
+        if (BuildConfig.DEBUG) Log.d("BottomSheet", "Sheet '$key' state changing from ${sheetVisible.value} to $newValue")
         sheetVisible.value = newValue
     }
 

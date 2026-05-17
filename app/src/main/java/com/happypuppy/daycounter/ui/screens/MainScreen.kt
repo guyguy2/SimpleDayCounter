@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
@@ -147,7 +148,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     // Log orientation changes
     val configuration = LocalConfiguration.current
     LaunchedEffect(configuration) {
-        Log.d("MainScreen", "Configuration changed: orientation=${configuration.orientation}")
+        if (BuildConfig.DEBUG) Log.d("MainScreen", "Configuration changed: orientation=${configuration.orientation}")
     }
 
     // Sort items based on selected option
@@ -599,7 +600,7 @@ fun SwipeToDeleteItem(
     LaunchedEffect(wasUndone) {
         if (wasUndone) {
             isRemoved = false
-            Log.d("SwipeDelete", "Reset removal state for undone item ${item.id}")
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Reset removal state for undone item ${item.id}")
         }
     }
 
@@ -617,7 +618,7 @@ fun SwipeToDeleteItem(
 
     LaunchedEffect(isRemoved) {
         if (isRemoved) {
-            Log.d("SwipeDelete", "Item ${item.id} marked as removed, animating...")
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Item ${item.id} marked as removed, animating...")
             // Vibrate if enabled
             if (isVibrationEnabled) {
                 val vibratorManager =
@@ -631,7 +632,7 @@ fun SwipeToDeleteItem(
                 )
             }
             delay(200)
-            Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
             onDelete()
         }
     }

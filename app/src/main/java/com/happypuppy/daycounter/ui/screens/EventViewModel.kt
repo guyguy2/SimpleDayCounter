@@ -3,6 +3,7 @@ package com.happypuppy.daycounter.ui.screens
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
 import kotlinx.coroutines.delay
@@ -69,7 +70,7 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     fun deleteItem(item: Item) {
         viewModelScope.launch {
             // Update UI state immediately
-            Log.d(TAG, "Deleting item ${item.id}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Deleting item ${item.id}")
             _uiState.value = _uiState.value.copy(
                 lastDeletedItem = item,
                 showUndoSnackbar = true
@@ -80,14 +81,14 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
 
             // Then update database; the items Flow will emit the new list.
             repository.deleteItem(item)
-            Log.d(TAG, "Item deleted, fetching updated list")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Item deleted, fetching updated list")
         }
     }
 
     fun undoDelete() {
         viewModelScope.launch {
             _uiState.value.lastDeletedItem?.let { deletedItem ->
-                Log.d(TAG, "Undoing delete for item ${deletedItem.id}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Undoing delete for item ${deletedItem.id}")
 
                 // Create a new map with this item's unique restoration key (current time)
                 val updatedRestoredKeys = _uiState.value.restoredItemKeys.toMutableMap()
@@ -111,7 +112,7 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
             val currentKeys = _uiState.value.restoredItemKeys.toMutableMap()
             currentKeys.remove(itemId)
             _uiState.value = _uiState.value.copy(restoredItemKeys = currentKeys)
-            Log.d(TAG, "Cleared restoration key for item $itemId")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Cleared restoration key for item $itemId")
         }
     }
 

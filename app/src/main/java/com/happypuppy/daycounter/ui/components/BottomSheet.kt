@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.ui.screens.rememberSaveableSheetState
@@ -68,7 +69,7 @@ fun AddEventBottomSheet(
 
     // Debug statement to confirm when date picker state changes
     LaunchedEffect(showDatePicker) {
-        Log.d("DatePicker", "Date picker visibility changed to: $showDatePicker")
+        if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker visibility changed to: $showDatePicker")
     }
 
     // Initialize date picker with current time
@@ -144,7 +145,7 @@ fun AddEventBottomSheet(
                     .matchParentSize() // This makes it exactly the same size as its parent Box
                     .clickable(
                         onClick = {
-                            Log.d("DatePicker", "Date field clicked, opening picker")
+                            if (BuildConfig.DEBUG) Log.d("DatePicker", "Date field clicked, opening picker")
                             setShowDatePicker(true)
                         }
                     )
@@ -177,7 +178,7 @@ fun AddEventBottomSheet(
             Button(
                 onClick = {
                     if (eventName.isNotBlank()) {
-                        Log.d("AddEvent", "Saving event: $eventName, date: $targetDate, category: $selectedCategory, emoji: $eventEmoji")
+                        if (BuildConfig.DEBUG) Log.d("AddEvent", "Saving event: $eventName, date: $targetDate, category: $selectedCategory, emoji: $eventEmoji")
                         onSave(eventName, targetDate, selectedCategory, eventEmoji)
                         onDismiss()
                     }
@@ -191,15 +192,15 @@ fun AddEventBottomSheet(
 
     // Date picker dialog
     if (showDatePicker) {
-        Log.d("DatePicker", "Showing date picker dialog")
+        if (BuildConfig.DEBUG) Log.d("DatePicker", "Showing date picker dialog")
         DatePickerDialog(
             onDismissRequest = {
-                Log.d("DatePicker", "Date picker dismissed")
+                if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker dismissed")
                 setShowDatePicker(false)
             },
             confirmButton = {
                 TextButton(onClick = {
-                    Log.d("DatePicker", "Date selection confirmed")
+                    if (BuildConfig.DEBUG) Log.d("DatePicker", "Date selection confirmed")
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
                         // This fixes the timezone issue by extracting just the year, month, and day
                         // from the selected timestamp and building a new date with those components
@@ -225,7 +226,7 @@ fun AddEventBottomSheet(
                         localCalendar.set(Calendar.MILLISECOND, 0)
 
                         targetDate = localCalendar.time
-                        Log.d("DatePicker", "New date set: $targetDate")
+                        if (BuildConfig.DEBUG) Log.d("DatePicker", "New date set: $targetDate")
                     }
                     setShowDatePicker(false)
                 }) {
@@ -234,7 +235,7 @@ fun AddEventBottomSheet(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    Log.d("DatePicker", "Date picker cancelled")
+                    if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker cancelled")
                     setShowDatePicker(false)
                 }) {
                     Text("Cancel")

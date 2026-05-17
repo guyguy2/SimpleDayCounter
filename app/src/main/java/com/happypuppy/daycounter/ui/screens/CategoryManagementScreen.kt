@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddCategoryInput
@@ -83,7 +84,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    Log.d("CategoryManagementScreen", "Orientation: ${if (isLandscape) "Landscape" else "Portrait"}")
+    if (BuildConfig.DEBUG) Log.d("CategoryManagementScreen", "Orientation: ${if (isLandscape) "Landscape" else "Portrait"}")
 
     Scaffold(
         topBar = {
