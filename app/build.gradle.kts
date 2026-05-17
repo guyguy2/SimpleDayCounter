@@ -25,7 +25,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 full mode: code shrinking, optimization, and resource shrinking.
+            // Keep rules for Room/Koin/Coroutines/Navigation live in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -41,6 +44,25 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        // `Instantiatable` is a known false positive for `MainActivity` which
+        // correctly extends `androidx.activity.ComponentActivity` (a subclass
+        // of `Activity`). It would otherwise fail `lintVitalRelease` and block
+        // `assembleRelease` even though the class is valid at runtime.
+        disable += "Instantiatable"
+    }
+
+    testOptions {
+        unitTests {
+            // Return default values (0 / null / false) from Android framework
+            // stubs instead of throwing `Method ... not mocked`. The ViewModel
+            // calls `android.util.Log.d` from inside coroutines launched on
+            // viewModelScope; the unmocked exception silently aborted the
+            // coroutine before any state update could be observed.
+            isReturnDefaultValues = true
+        }
     }
 }
 
