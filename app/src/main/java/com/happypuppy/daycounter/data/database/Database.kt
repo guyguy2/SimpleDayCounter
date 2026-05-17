@@ -39,7 +39,7 @@ interface ItemDao {
     suspend fun deleteAllItems()
 }
 
-@Database(entities = [Item::class], version = 4, exportSchema = false)
+@Database(entities = [Item::class], version = 4, exportSchema = true)
 @TypeConverters(DateConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
