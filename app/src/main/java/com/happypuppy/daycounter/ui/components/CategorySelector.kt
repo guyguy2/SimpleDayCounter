@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
@@ -88,7 +89,7 @@ fun CategorySelector(
                     .matchParentSize()
                     .clickable(
                         onClick = {
-                            Log.d("CategorySelector", "Category field clicked, opening dropdown")
+                            if (BuildConfig.DEBUG) Log.d("CategorySelector", "Category field clicked, opening dropdown")
                             showCategoryDropdown = true
                         }
                     )

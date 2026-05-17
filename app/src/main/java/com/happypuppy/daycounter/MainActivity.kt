@@ -26,7 +26,7 @@ import org.koin.compose.koinInject
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("MainActivity", "onCreate: savedInstanceState = $savedInstanceState")
+        if (BuildConfig.DEBUG) Log.d("MainActivity", "onCreate: savedInstanceState = $savedInstanceState")
 
         setContent {
             AppContent()
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
-        Log.d("MainActivity", "onConfigurationChanged: orientation = ${newConfig.orientation}")
+        if (BuildConfig.DEBUG) Log.d("MainActivity", "onConfigurationChanged: orientation = ${newConfig.orientation}")
     }
 }
 
@@ -45,8 +45,10 @@ fun AppContent() {
     val themePreference = dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
     val isSystemInDarkTheme = isSystemInDarkTheme()
 
-    Log.d("AppTheme", "themePreference: ${themePreference.value}")
-    Log.d("AppTheme", "isSystemInDarkTheme: $isSystemInDarkTheme")
+    if (BuildConfig.DEBUG) {
+        Log.d("AppTheme", "themePreference: ${themePreference.value}")
+        Log.d("AppTheme", "isSystemInDarkTheme: $isSystemInDarkTheme")
+    }
 
     val selectedTheme = when (themePreference.value) {
         AppTheme.SYSTEM_DEFAULT -> isSystemInDarkTheme
@@ -54,7 +56,7 @@ fun AppContent() {
         AppTheme.DARK -> true
     }
 
-    Log.d("AppTheme", "Final darkTheme setting: $selectedTheme")
+    if (BuildConfig.DEBUG) Log.d("AppTheme", "Final darkTheme setting: $selectedTheme")
 
     SimpleDayCounterTheme(
         darkTheme = selectedTheme

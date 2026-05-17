@@ -44,6 +44,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // BuildConfig.DEBUG is referenced by Log.d guards across the app to
+        // strip debug logging from release builds.
+        buildConfig = true
     }
 
     lint {

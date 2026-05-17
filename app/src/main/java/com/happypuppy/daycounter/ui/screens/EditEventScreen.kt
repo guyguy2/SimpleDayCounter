@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
@@ -71,7 +72,7 @@ fun EditEventScreen(
 
     // Log state for debugging
     LaunchedEffect(showDatePicker) {
-        Log.d("EditEventScreen", "Date picker visibility for item ${item.id}: $showDatePicker")
+        if (BuildConfig.DEBUG) Log.d("EditEventScreen", "Date picker visibility for item ${item.id}: $showDatePicker")
     }
 
     val datePickerState = rememberDatePickerState(
@@ -150,7 +151,7 @@ fun EditEventScreen(
                     .matchParentSize()
                     .clickable(
                         onClick = {
-                            Log.d("DatePicker", "Edit screen date field clicked, opening picker")
+                            if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen date field clicked, opening picker")
                             setShowDatePicker(true)
                         }
                     )
@@ -232,7 +233,7 @@ fun EditEventScreen(
                         localCalendar.set(Calendar.MILLISECOND, 0)
 
                         targetDate = localCalendar.time
-                        Log.d("DatePicker", "Edit screen: New date set: $targetDate")
+                        if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen: New date set: $targetDate")
                     }
                     setShowDatePicker(false)
                 }) {

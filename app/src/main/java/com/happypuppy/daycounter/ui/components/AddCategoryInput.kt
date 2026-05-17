@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import org.koin.compose.koinInject
 
@@ -76,7 +77,7 @@ fun AddCategoryInput(
                             // Use the async function with callback
                             dataStoreManager.addCategoryAsync(formattedCategory) { success ->
                                 if (success) {
-                                    Log.d("CategoryAdd", "Successfully added: $formattedCategory")
+                                    if (BuildConfig.DEBUG) Log.d("CategoryAdd", "Successfully added: $formattedCategory")
                                     onCategoryAdded(formattedCategory)
                                 } else {
                                     Log.e("CategoryAdd", "Failed to add category")

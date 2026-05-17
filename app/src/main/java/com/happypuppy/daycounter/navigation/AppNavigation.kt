@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.ui.screens.CategoryManagementScreen
 import com.happypuppy.daycounter.ui.screens.MainScreen
 import com.happypuppy.daycounter.ui.screens.SettingsScreen
@@ -68,7 +69,7 @@ fun AppNavigation() {
 
             LaunchedEffect(key1 = true) {
                 delay(1500)
-                Log.d("Navigation", "Navigating from Splash to Main")
+                if (BuildConfig.DEBUG) Log.d("Navigation", "Navigating from Splash to Main")
                 navController.navigate(Screen.Main.route) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
