@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -63,6 +64,8 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(1, "to-delete"))
+        // Run the part of the launched coroutine that executes before `delay(200)`.
+        runCurrent()
 
         // Optimistic UI update happens before the 200ms delay.
         val mid = viewModel.uiState.value
@@ -178,6 +181,68 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         assertEquals(setOf(2), viewModel.uiState.value.restoredItemKeys.keys)
+    }
+
+    @Test
+    fun `clearRestorationKey is a no-op when the id is not present`() = runTest(dispatcher) {
+        dao.insertItem(item(1, "only"))
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.deleteItem(item(1, "only"))
+        advanceTimeBy(250)
+        advanceUntilIdle()
+        viewModel.undoDelete()
+        advanceUntilIdle()
+
+        assertEquals(setOf(1), viewModel.uiState.value.restoredItemKeys.keys)
+
+        // Clearing an id that was never restored should leave the map untouched.
+        viewModel.clearRestorationKey(999)
+        advanceUntilIdle()
+
+        assertEquals(
+            "clearRestorationKey for an unknown id should not mutate the map",
+            setOf(1),
+            viewModel.uiState.value.restoredItemKeys.keys
+        )
+    }
+
+    @Test
+    fun `undoing the same id twice refreshes its restoration key`() = runTest(dispatcher) {
+        dao.insertItem(item(5, "again"))
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        // First delete + undo cycle.
+        viewModel.deleteItem(item(5, "again"))
+        advanceTimeBy(250)
+        advanceUntilIdle()
+        viewModel.undoDelete()
+        advanceUntilIdle()
+        val firstKey = viewModel.uiState.value.restoredItemKeys[5]
+        assertNotNull("first undo should set a restoration key", firstKey)
+
+        // The key is a wall-clock millisecond timestamp; force a measurable gap so
+        // the second key cannot collide with the first.
+        Thread.sleep(2)
+
+        // Second delete + undo cycle for the same id.
+        viewModel.deleteItem(item(5, "again"))
+        advanceTimeBy(250)
+        advanceUntilIdle()
+        viewModel.undoDelete()
+        advanceUntilIdle()
+        val secondKey = viewModel.uiState.value.restoredItemKeys[5]
+        assertNotNull("second undo should set a restoration key", secondKey)
+
+        // A fresh key forces LazyColumn to remount the row so the swipe-restore
+        // animation replays. If the key were sticky the row would not animate again.
+        assertTrue(
+            "subsequent undo must produce a strictly newer restoration key",
+            secondKey!! > firstKey!!
+        )
+        assertEquals(setOf(5), viewModel.uiState.value.restoredItemKeys.keys)
     }
 
     @Test
