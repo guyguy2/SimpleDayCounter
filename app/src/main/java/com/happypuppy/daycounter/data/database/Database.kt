@@ -12,6 +12,7 @@ import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.happypuppy.daycounter.data.repository.DateConverters
+import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
 @Entity(tableName = "items")
@@ -27,7 +28,7 @@ data class Item(
 @Dao
 interface ItemDao {
     @Query("SELECT * FROM items ORDER BY created_at DESC")
-    suspend fun getAllItems(): List<Item>
+    fun getAllItems(): Flow<List<Item>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: Item)
@@ -46,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
 }
 
 class ItemRepository(private val itemDao: ItemDao) {
-    suspend fun getAllItems() = itemDao.getAllItems()
+    fun getAllItems(): Flow<List<Item>> = itemDao.getAllItems()
     suspend fun insertItem(item: Item) = itemDao.insertItem(item)
     suspend fun deleteItem(item: Item) = itemDao.deleteItem(item)
     suspend fun deleteAllItems() = itemDao.deleteAllItems()
