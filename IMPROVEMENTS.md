@@ -538,3 +538,22 @@ Review-only session: no code changes. Re-read the full source tree against the o
 3. P1-1 Koin hoist - pairs naturally with the F-1 surgery.
 4. F-3 dead-code sweep - trivial.
 
+---
+
+## Session 2026-06-11 - Wave 9
+
+### Status
+- Wave-8 work committed: the P1-5 theme refactor (4 files) and the wave-8 + review-pass doc entries ship as two commits (`refactor:` + `docs:`), matching the prior wave's split.
+- F-1 (edit-sheet restore bug): DONE. `MainScreen` now saves only `selectedItemId: Int?` via `rememberSaveable` and resolves the `Item` against `uiState.items` with a `remember(uiState.items, selectedItemId)` lookup. The card click sets the id instead of the object, the `selectedItem!!` became a smart-cast plain read (local `val`), and the dead `SelectedItemData`/`toData`/`toItem` mechanism - the entire `FilterStateSaver.kt` file - is deleted. Edit sheet now reopens correctly after rotation/process death; previously `showEditEventSheet` restored to `true` with a null item and silently failed.
+- Side benefit: if the underlying item changes while the sheet is open (Room flow re-emits), the lookup keeps `selectedItem` consistent with the database instead of holding a stale copy.
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest` -> `BUILD SUCCESSFUL in 10s`. 32/32 green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8). No remaining references to `SelectedItemData` (`rg` clean).
+- Rotation/process-death path is Compose-level state; no JVM-unit-test coverage exists for it (no Robolectric/instrumented tests in the project). Manual smoke: open edit sheet, rotate, sheet should persist - pending a device session.
+
+### Next
+- F-2 (`restoredItemKeys` leak + redundant inner `key {}`) - same `MainScreen` region, natural follow-up.
+- P1-1 Koin hoist (`SwipeToDeleteItem` second `koinViewModel`, `formatDate` lift, leaf `koinInject` removal).
+- F-3 dead-code sweep (`deleteAllItems` chain, `isAdding` in `BottomSheet.kt`).
+- Smoke-install release APK on device (carried over since wave 4); now also covers the F-1 rotation check.
+
