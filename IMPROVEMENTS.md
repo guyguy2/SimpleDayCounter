@@ -516,7 +516,7 @@ Review-only session: no code changes. Re-read the full source tree against the o
 
 | # | Issue | File(s) | Effort | Notes |
 |---|-------|---------|--------|-------|
-| F-1 | **Edit-sheet restore bug.** `selectedItemData` is declared saveable but never written: the card click at `MainScreen.kt:518` sets the non-saveable `selectedItem` directly, and `Item.toData()` (`FilterStateSaver.kt:23`) has zero callers. After process death or config change, `showEditEventSheet` restores to `true` while the item is `null`, so the sheet silently fails to show and the flag stays stale. The whole `SelectedItemData` mechanism is dead weight | `MainScreen.kt:123-132,518`, `FilterStateSaver.kt` | S | Drop `SelectedItemData` entirely; save just the item ID and look it up in `uiState.items` (the section 4 suggestion). Fix alongside P1-1 since both touch the same `MainScreen` region |
+| F-1 | **DONE (wave 9).** **Edit-sheet restore bug.** `selectedItemData` is declared saveable but never written: the card click at `MainScreen.kt:518` sets the non-saveable `selectedItem` directly, and `Item.toData()` (`FilterStateSaver.kt:23`) has zero callers. After process death or config change, `showEditEventSheet` restores to `true` while the item is `null`, so the sheet silently fails to show and the flag stays stale. The whole `SelectedItemData` mechanism is dead weight | `MainScreen.kt:123-132,518`, `FilterStateSaver.kt` | S | Drop `SelectedItemData` entirely; save just the item ID and look it up in `uiState.items` (the section 4 suggestion). Fix alongside P1-1 since both touch the same `MainScreen` region |
 | F-2 | **Undo bookkeeping leaks.** `clearRestorationKey` (`EventViewModel.kt:110`) is tested but has no production caller, so every undo adds a `restoredItemKeys` entry that lives for the app's lifetime. The list is also double-keyed: `items(key = ...)` already uses `"${id}_$restorationKey"`, making the inner `key(item.id, restorationKey)` wrapper redundant | `EventViewModel.kt:110`, `MainScreen.kt:505-513` | S | Call `clearRestorationKey` after the restore animation (or auto-expire entries); drop the inner `key {}` block |
 | F-3 | **Dead code sweep.** `deleteAllItems` (`EventViewModel.kt:126` + repository + DAO chain) has no UI caller; `isAdding` in `BottomSheet.kt:68` is declared but never set or read (decayed further since the section 13 note - the `AddCategoryInput.kt` one is fine) | `EventViewModel.kt:126`, `Database.kt:40,53`, `BottomSheet.kt:68` | S | Delete all three, or hook `deleteAllItems` to a settings action if wanted |
 | F-4 | **Stale toolchain (June 2026).** Compose BOM `2025.02.00`, Kotlin `2.1.10`, AGP `8.9.0`, Room `2.6.1` (2.7+ stable), Koin `3.5.0` (folds in P2-11). Build prints an "SDK XML version 4" mismatch warning from old command-line tools | `gradle/libs.versions.toml` | M | One coordinated bump wave; rerun full verify pipeline including `assembleRelease` |
@@ -533,8 +533,8 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - `./gradlew testDebugUnitTest` -> 32/32 green on the wave-8 dirty tree (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8). No failures in JUnit XML.
 
 ### Next (suggested wave order)
-1. Commit the uncommitted wave-8 work first so the next wave's diffs stay clean.
-2. F-1 (real restore bug) + F-2 (leak) - small, test-coverable, same `MainScreen` region.
+1. ~~Commit the uncommitted wave-8 work first so the next wave's diffs stay clean.~~ DONE (wave 9).
+2. F-1 ~~(real restore bug)~~ DONE (wave 9) + F-2 (leak) - still open, small, test-coverable, same `MainScreen` region.
 3. P1-1 Koin hoist - pairs naturally with the F-1 surgery.
 4. F-3 dead-code sweep - trivial.
 
@@ -551,9 +551,10 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - `./gradlew assembleDebug testDebugUnitTest` -> `BUILD SUCCESSFUL in 10s`. 32/32 green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8). No remaining references to `SelectedItemData` (`rg` clean).
 - Rotation/process-death path is Compose-level state; no JVM-unit-test coverage exists for it (no Robolectric/instrumented tests in the project). Manual smoke: open edit sheet, rotate, sheet should persist - pending a device session.
 
-### Next
-- F-2 (`restoredItemKeys` leak + redundant inner `key {}`) - same `MainScreen` region, natural follow-up.
+### Next (start here next session)
+- F-2 (`restoredItemKeys` leak + redundant inner `key {}`) - same `MainScreen` region, natural follow-up. Highest-value open item alongside P1-1.
 - P1-1 Koin hoist (`SwipeToDeleteItem` second `koinViewModel`, `formatDate` lift, leaf `koinInject` removal).
 - F-3 dead-code sweep (`deleteAllItems` chain, `isAdding` in `BottomSheet.kt`).
+- F-4 toolchain bump / F-5 polish - lower priority, batch when convenient.
 - Smoke-install release APK on device (carried over since wave 4); now also covers the F-1 rotation check.
 
