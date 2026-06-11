@@ -119,16 +119,11 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     val (showAddEventSheet, setShowAddEventSheet) = rememberSaveableSheetState("addEventSheet", false)
     val (showEditEventSheet, setShowEditEventSheet) = rememberSaveableSheetState("editEventSheet", false)
 
-    // Use a nullable holder
-    var selectedItemData by rememberSaveable { mutableStateOf<SelectedItemData?>(null) }
-// Create a computed value for selectedItem based on selectedItemData
-    var selectedItem by remember {
-        mutableStateOf<Item?>(null)
-    }
-
-// Update selectedItem when selectedItemData changes
-    LaunchedEffect(selectedItemData) {
-        selectedItem = selectedItemData?.toItem()
+    // Save only the selected item's id; resolve the Item against the current list so the
+    // edit sheet survives configuration changes and process death (IMPROVEMENTS.md F-1).
+    var selectedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedItem = remember(uiState.items, selectedItemId) {
+        uiState.items.find { it.id == selectedItemId }
     }
     var showFilterMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -515,7 +510,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                     item = item,
                                     onDelete = { viewModel.deleteItem(item) },
                                     onClick = {
-                                        selectedItem = item
+                                        selectedItemId = item.id
                                         setShowEditEventSheet(true)
                                     }
                                 )
@@ -558,7 +553,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     sheetState = bottomSheetState
                 ) {
                     EditEventScreen(
-                        item = selectedItem!!,
+                        item = selectedItem,
                         onSave = { item ->
                             viewModel.updateItem(item)
                             setShowEditEventSheet(false)
