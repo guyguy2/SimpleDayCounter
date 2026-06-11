@@ -486,4 +486,55 @@ Addressed in section 4. Naming a class `ViewModel` is a critical naming violatio
 - P2-7 (type-safe Compose Navigation) - replace string-based routes with `@Serializable` objects so transitions stop string-matching.
 - Once a v5 schema change is on the roadmap: write `Migration(4, 5)`, add `room-testing` to `androidTest`, and remove `fallbackToDestructiveMigration` from `di/AppModule.kt:22`.
 
+---
+
+## Session 2026-05-19 - Wave 8
+
+### Status
+- P1-5 (hoist theme resolution to `CompositionLocal`): DONE. `Theme.kt` now defines two `staticCompositionLocalOf` providers - `LocalIsDarkTheme: Boolean` and `LocalDateFormat: DateFormat` - and `SimpleDayCounterTheme` wraps its `MaterialTheme { content }` in a `CompositionLocalProvider` that supplies both. `useDarkTheme` is computed once at the theme level from the `AppTheme` preference + `isSystemInDarkTheme()`; `dateFormatFlow` is collected once at the theme level instead of per card. The three duplicated theme-resolution blocks were removed: `EventCard.kt:62-74` (dropped `koinInject`-driven `themeFlow`+`dateFormatFlow` collection and the 4-arm `when (themePreference)`), `CategorySelector.kt:50-56` (dropped `themeFlow` collection + `when` block; kept `koinInject<DataStoreManager>` for `customCategoriesFlow`), `CategoryManagementScreen.kt:75-81` (same shape as `CategorySelector`). `EventCard` still carries a single `koinInject<DataStoreManager>()` for its lone `formatDate(...)` call - cleaning that up is tracked under P1-1. Removed five now-unused imports (`isSystemInDarkTheme` in all three, `AppTheme` in two, `DateFormat` in `EventCard`, and `collectAsState`/`getValue` in `EventCard`). Net: theme state for "is dark" + "what date format" is now resolved exactly once per composition pass at `SimpleDayCounterTheme`, not three+N-cards times.
+- Static (`staticCompositionLocalOf`) chosen over `compositionLocalOf` deliberately: theme/date-format do change at runtime (user taps a settings toggle), but they invalidate every consumer when they change anyway, and `static` avoids tracking individual reads which is the cheaper path. The unused `compositionLocalOf` import the prior agent left in Theme.kt was removed.
+
+### Verify
+- `./gradlew assembleDebug` -> `BUILD SUCCESSFUL in 7s`. Only warning is the pre-existing `'var statusBarColor: Int' is deprecated` in `Theme.kt:208` (was at `:186` pre-edit; line shifted by the new `CompositionLocal` declarations). No new warnings.
+- `./gradlew testDebugUnitTest` -> `BUILD SUCCESSFUL in 2s`. 32/32 green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8) - identical coverage to wave 7, no ViewModel-layer change.
+- `assembleRelease` not re-run this wave (pure UI/theme refactor, no R8/keep-rule impact).
+
+### Next
+- Smoke-install the R8 release APK on a physical device (carried over from waves 4-7).
+- P1-1 (`koinInject`/`koinViewModel` in leaf composables) - still open. Concrete sites now narrowed: `EventCard.kt` retains a single `koinInject<DataStoreManager>()` for `formatDate(item.targetDate, dateFormat)`; cleanest fix is to lift `formatDate` to a top-level `fun formatDate(date: Date, format: DateFormat): String` in `DataStoreManager.kt` (it's already pure - just touches `SimpleDateFormat` + `Locale`), then `EventCard` needs zero Koin at all. `CategorySelector` and `CategoryManagementScreen` should accept their `DataStoreManager` (or a callback set) from their callers. `SwipeToDeleteItem` in `MainScreen.kt:585` still calls `koinViewModel<EventViewModel>()` independently of its parent's instance - pass the VM in instead. `AddCategoryInput` similar shape.
+- P2-7 (type-safe Compose Navigation) - unchanged from wave 7.
+- Once a v5 schema change is on the roadmap: write `Migration(4, 5)`, add `room-testing` to `androidTest`, and remove `fallbackToDestructiveMigration` from `di/AppModule.kt:22`.
+
+---
+
+## Session 2026-06-11 - Review Pass (new findings)
+
+### Status
+Review-only session: no code changes. Re-read the full source tree against the open roadmap, verified the wave-8 dirty tree is still green (32/32 unit tests), and logged new findings not covered by the original report. Wave-8 changes (P1-5 `CompositionLocal` hoist) remain uncommitted - commit them before starting the next wave.
+
+### New findings (sorted by value, related items folded together)
+
+| # | Issue | File(s) | Effort | Notes |
+|---|-------|---------|--------|-------|
+| F-1 | **Edit-sheet restore bug.** `selectedItemData` is declared saveable but never written: the card click at `MainScreen.kt:518` sets the non-saveable `selectedItem` directly, and `Item.toData()` (`FilterStateSaver.kt:23`) has zero callers. After process death or config change, `showEditEventSheet` restores to `true` while the item is `null`, so the sheet silently fails to show and the flag stays stale. The whole `SelectedItemData` mechanism is dead weight | `MainScreen.kt:123-132,518`, `FilterStateSaver.kt` | S | Drop `SelectedItemData` entirely; save just the item ID and look it up in `uiState.items` (the section 4 suggestion). Fix alongside P1-1 since both touch the same `MainScreen` region |
+| F-2 | **Undo bookkeeping leaks.** `clearRestorationKey` (`EventViewModel.kt:110`) is tested but has no production caller, so every undo adds a `restoredItemKeys` entry that lives for the app's lifetime. The list is also double-keyed: `items(key = ...)` already uses `"${id}_$restorationKey"`, making the inner `key(item.id, restorationKey)` wrapper redundant | `EventViewModel.kt:110`, `MainScreen.kt:505-513` | S | Call `clearRestorationKey` after the restore animation (or auto-expire entries); drop the inner `key {}` block |
+| F-3 | **Dead code sweep.** `deleteAllItems` (`EventViewModel.kt:126` + repository + DAO chain) has no UI caller; `isAdding` in `BottomSheet.kt:68` is declared but never set or read (decayed further since the section 13 note - the `AddCategoryInput.kt` one is fine) | `EventViewModel.kt:126`, `Database.kt:40,53`, `BottomSheet.kt:68` | S | Delete all three, or hook `deleteAllItems` to a settings action if wanted |
+| F-4 | **Stale toolchain (June 2026).** Compose BOM `2025.02.00`, Kotlin `2.1.10`, AGP `8.9.0`, Room `2.6.1` (2.7+ stable), Koin `3.5.0` (folds in P2-11). Build prints an "SDK XML version 4" mismatch warning from old command-line tools | `gradle/libs.versions.toml` | M | One coordinated bump wave; rerun full verify pipeline including `assembleRelease` |
+| F-5 | **Minor polish.** (a) Vibrator API duplicated in two styles: `MainScreen.kt:624` casts `VIBRATOR_MANAGER_SERVICE`, `SettingsScreen.kt:270` uses `getSystemService(context, Vibrator::class.java)` - same 100ms one-shot; extract one `vibrate(context)` util. (b) `DateFormatSetting`'s `DropdownMenu` (`SettingsScreen.kt:537`) sits outside its anchor `Box`, so it opens at the parent corner instead of under the field | `MainScreen.kt:624`, `SettingsScreen.kt:270,537` | S | Cosmetic/consistency only; batch with any nearby wave |
+
+### Carried-over items confirmed still open in code (highest value first)
+- P1-1 - `koinViewModel<EventViewModel>()` inside `SwipeToDeleteItem` (`MainScreen.kt:586`) creates a second VM lookup and collects the entire `uiState` per row just for `restoredItemKeys`. Plus `koinInject` in `EventCard`, `CategorySelector`, `AddCategoryInput`, `BottomSheet`, `CategoryManagementScreen`. `formatDate` (`DataStoreManager.kt:147`) is pure - lift to a top-level function, then `EventCard` needs zero Koin (it already reads `LocalDateFormat`). Unblocks `@Preview` everywhere.
+- P2-2/P2-3 - `MainScreen.kt` now 686 lines; filter+sort menus ~200 lines inline; `SortOption`/`FilterOption`/`FilterState`/`filterItems` still in the UI file; `filterOption: String` / `filterState` duplication still synced via `LaunchedEffect` (`MainScreen.kt:179`) - make `FilterState` itself saveable and delete the sync.
+- P1-4 - `addCategoryAsync` unmanaged `CoroutineScope(Dispatchers.IO)` at `DataStoreManager.kt:123`.
+- P2-8 - splash double-`delay(1500)` + mutating `startDestination` on a composed NavHost (`AppNavigation.kt:26-39`); the outer `showSplash` state is illusory since `startDestination` is read once.
+- P0-2 remainder - `fallbackToDestructiveMigration` still ships; correctly deferred until a v5 schema change per wave-5 reasoning.
+
+### Verify
+- `./gradlew testDebugUnitTest` -> 32/32 green on the wave-8 dirty tree (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8). No failures in JUnit XML.
+
+### Next (suggested wave order)
+1. Commit the uncommitted wave-8 work first so the next wave's diffs stay clean.
+2. F-1 (real restore bug) + F-2 (leak) - small, test-coverable, same `MainScreen` region.
+3. P1-1 Koin hoist - pairs naturally with the F-1 surgery.
+4. F-3 dead-code sweep - trivial.
 
