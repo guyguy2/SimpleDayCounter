@@ -2,7 +2,6 @@ package com.happypuppy.daycounter.ui.screens
 
 import android.content.res.Configuration
 import android.util.Log
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,12 +45,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
-import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddCategoryInput
 import com.happypuppy.daycounter.ui.components.CategoryColorIndicator
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.ui.theme.CategoryColors
+import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -71,14 +70,8 @@ fun CategoryManagementScreen(navController: NavHostController) {
     val defaultListState = rememberLazyListState()
     val customListState = rememberLazyListState()
 
-    // Determine if dark theme is active
-    val themePreference by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
-    val systemInDarkTheme = isSystemInDarkTheme()
-    val isDarkTheme = when (themePreference) {
-        AppTheme.SYSTEM_DEFAULT -> systemInDarkTheme
-        AppTheme.LIGHT -> false
-        AppTheme.DARK -> true
-    }
+    // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
+    val isDarkTheme = LocalIsDarkTheme.current
 
     // Get the current orientation
     val configuration = LocalConfiguration.current

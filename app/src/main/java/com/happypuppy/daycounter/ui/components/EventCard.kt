@@ -3,7 +3,6 @@ package com.happypuppy.daycounter.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,15 +35,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happypuppy.daycounter.data.database.Item
-import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.DarkCardPink
 import com.happypuppy.daycounter.ui.theme.DarkCardPurple
 import com.happypuppy.daycounter.ui.theme.DarkCardYellow
 import com.happypuppy.daycounter.ui.theme.DarkOnSurface
 import com.happypuppy.daycounter.ui.theme.DarkOnSurfaceVariant
+import com.happypuppy.daycounter.ui.theme.LocalDateFormat
+import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.isColorBright
 import org.koin.compose.koinInject
@@ -58,20 +55,14 @@ fun EventCard(
 ) {
     val daysLeft = calculateDaysLeft(item.targetDate)
 
-    // Get the data store manager for theme and date format
+    // Theme + date format are resolved once at SimpleDayCounterTheme; consume them here instead
+    // of re-collecting the DataStore flows per card (IMPROVEMENTS.md P1-5).
+    val isDarkTheme = LocalIsDarkTheme.current
+    val dateFormat = LocalDateFormat.current
+
+    // formatDate is a pure helper on DataStoreManager; we keep the inject for that single call.
+    // Removing this remaining koinInject is tracked separately as P1-1.
     val dataStoreManager = koinInject<DataStoreManager>()
-    val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
-
-    // Get the current theme preference directly
-    val themePreference by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
-    val systemInDarkTheme = isSystemInDarkTheme()
-
-    // Determine theme based on the app's setting
-    val isDarkTheme = when (themePreference) {
-        AppTheme.SYSTEM_DEFAULT -> systemInDarkTheme
-        AppTheme.LIGHT -> false
-        AppTheme.DARK -> true
-    }
 
     // Calculate the appropriate background color based on days left and theme
     val backgroundColor = if (isDarkTheme) {
