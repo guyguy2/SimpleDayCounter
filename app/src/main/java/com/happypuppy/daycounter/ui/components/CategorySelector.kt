@@ -2,7 +2,6 @@ package com.happypuppy.daycounter.ui.components
 
 import android.util.Log
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
-import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.theme.CategoryColors
+import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import org.koin.compose.koinInject
 
 // Predefined default categories
@@ -46,14 +45,8 @@ fun CategorySelector(
     // Get custom categories from DataStore
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
 
-    // Determine if dark theme is active
-    val themePreference by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
-    val systemInDarkTheme = isSystemInDarkTheme()
-    val isDarkTheme = when (themePreference) {
-        AppTheme.SYSTEM_DEFAULT -> systemInDarkTheme
-        AppTheme.LIGHT -> false
-        AppTheme.DARK -> true
-    }
+    // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
+    val isDarkTheme = LocalIsDarkTheme.current
 
     // Combine default and custom categories for the dropdown
     val allCategories = remember(customCategories) {

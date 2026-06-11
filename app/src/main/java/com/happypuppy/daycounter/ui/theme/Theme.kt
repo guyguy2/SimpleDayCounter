@@ -9,8 +9,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -23,7 +26,27 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.data.preferences.DateFormat
 import org.koin.compose.koinInject
+
+/**
+ * Whether the app is currently rendering with the dark color scheme.
+ *
+ * Resolved once in [SimpleDayCounterTheme] from the user's [AppTheme] preference and the system
+ * setting. Leaf composables that need to vary by light/dark should read this instead of collecting
+ * the theme flow and recomputing per-call site (see IMPROVEMENTS.md P1-5).
+ */
+val LocalIsDarkTheme = staticCompositionLocalOf<Boolean> {
+    error("LocalIsDarkTheme not provided. Wrap content in SimpleDayCounterTheme.")
+}
+
+/**
+ * The current date format preference. Provided by [SimpleDayCounterTheme] so individual cards do
+ * not each subscribe to [DataStoreManager.dateFormatFlow].
+ */
+val LocalDateFormat = staticCompositionLocalOf<DateFormat> {
+    error("LocalDateFormat not provided. Wrap content in SimpleDayCounterTheme.")
+}
 
 // Light Theme Colors
 val Purple80 = Color(0xFFD0BCFF)
@@ -151,6 +174,10 @@ fun SimpleDayCounterTheme(
     val themePreferenceState = dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
     val themePreference = themePreferenceState.value
 
+    // Collect the date format preference once at the theme level so leaf composables can
+    // consume it via LocalDateFormat instead of re-subscribing per card (IMPROVEMENTS.md P1-5).
+    val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
+
     // Determine if dark theme should be used based on the saved preference
     val useDarkTheme = when (themePreference) {
         AppTheme.SYSTEM_DEFAULT -> darkTheme
@@ -185,10 +212,16 @@ fun SimpleDayCounterTheme(
         }
     }
 
-    // Use our Material3 AppTypography
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    // Provide the resolved theme + date format down the tree so leaf composables don't each
+    // recompute these from DataStore. Use our Material3 AppTypography.
+    CompositionLocalProvider(
+        LocalIsDarkTheme provides useDarkTheme,
+        LocalDateFormat provides dateFormat
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            content = content
+        )
+    }
 }
