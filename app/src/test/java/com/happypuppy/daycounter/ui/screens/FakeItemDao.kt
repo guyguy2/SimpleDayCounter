@@ -38,8 +38,4 @@ class FakeItemDao : ItemDao {
     override suspend fun deleteItem(item: Item) {
         itemsFlow.value = itemsFlow.value.filterNot { it.id == item.id }
     }
-
-    override suspend fun deleteAllItems() {
-        itemsFlow.value = emptyList()
-    }
 }

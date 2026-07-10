@@ -56,7 +56,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.mapSaver
@@ -500,24 +499,23 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     ) {
                         items(
                             items = filteredAndSortedItems,
+                            // Include restoration timestamp so undo remounts the row
+                            // (resets swipe state). Inner key {} is unnecessary.
                             key = { item ->
-                                val restorationKey = uiState.restoredItemKeys[item.id] ?: 0
+                                val restorationKey = uiState.restoredItemKeys[item.id] ?: 0L
                                 "${item.id}_$restorationKey"
                             }
                         ) { item ->
-                            val restorationKey = uiState.restoredItemKeys[item.id] ?: 0
-                            key(item.id, restorationKey) {
-                                SwipeToDeleteItem(
-                                    item = item,
-                                    wasUndone = uiState.restoredItemKeys.containsKey(item.id),
-                                    isVibrationEnabled = isVibrationEnabled,
-                                    onDelete = { viewModel.deleteItem(item) },
-                                    onClick = {
-                                        selectedItemId = item.id
-                                        setShowEditEventSheet(true)
-                                    }
-                                )
-                            }
+                            SwipeToDeleteItem(
+                                item = item,
+                                wasUndone = uiState.restoredItemKeys.containsKey(item.id),
+                                isVibrationEnabled = isVibrationEnabled,
+                                onDelete = { viewModel.deleteItem(item) },
+                                onClick = {
+                                    selectedItemId = item.id
+                                    setShowEditEventSheet(true)
+                                }
+                            )
                         }
 
                         item {

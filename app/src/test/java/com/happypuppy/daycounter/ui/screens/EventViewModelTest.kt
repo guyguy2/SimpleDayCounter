@@ -97,7 +97,8 @@ class EventViewModelTest {
         assertTrue(viewModel.uiState.value.items.isEmpty())
 
         viewModel.undoDelete()
-        advanceUntilIdle()
+        // runCurrent flushes work up to the auto-expire delay without draining the TTL.
+        runCurrent()
 
         val state = viewModel.uiState.value
         assertFalse("snackbar should be cleared after undo", state.showUndoSnackbar)
@@ -165,20 +166,22 @@ class EventViewModelTest {
 
         viewModel.deleteItem(item(1, "a"))
         advanceTimeBy(250)
-        advanceUntilIdle()
+        runCurrent()
         viewModel.undoDelete()
-        advanceUntilIdle()
+        runCurrent()
 
+        // Avoid advanceUntilIdle after the first undo - it would drain the TTL and
+        // auto-clear key 1 before we assert both keys are present.
         viewModel.deleteItem(item(2, "b"))
         advanceTimeBy(250)
-        advanceUntilIdle()
+        runCurrent()
         viewModel.undoDelete()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(setOf(1, 2), viewModel.uiState.value.restoredItemKeys.keys)
 
         viewModel.clearRestorationKey(1)
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(setOf(2), viewModel.uiState.value.restoredItemKeys.keys)
     }
@@ -193,13 +196,13 @@ class EventViewModelTest {
         advanceTimeBy(250)
         advanceUntilIdle()
         viewModel.undoDelete()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(setOf(1), viewModel.uiState.value.restoredItemKeys.keys)
 
         // Clearing an id that was never restored should leave the map untouched.
         viewModel.clearRestorationKey(999)
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(
             "clearRestorationKey for an unknown id should not mutate the map",
@@ -219,7 +222,7 @@ class EventViewModelTest {
         advanceTimeBy(250)
         advanceUntilIdle()
         viewModel.undoDelete()
-        advanceUntilIdle()
+        runCurrent()
         val firstKey = viewModel.uiState.value.restoredItemKeys[5]
         assertNotNull("first undo should set a restoration key", firstKey)
 
@@ -228,11 +231,13 @@ class EventViewModelTest {
         Thread.sleep(2)
 
         // Second delete + undo cycle for the same id.
+        // advanceTimeBy for deleteItem's delay(200) also drains part of the first
+        // undo's TTL; the timestamp-identity check must keep the second key alive.
         viewModel.deleteItem(item(5, "again"))
         advanceTimeBy(250)
         advanceUntilIdle()
         viewModel.undoDelete()
-        advanceUntilIdle()
+        runCurrent()
         val secondKey = viewModel.uiState.value.restoredItemKeys[5]
         assertNotNull("second undo should set a restoration key", secondKey)
 
@@ -243,6 +248,33 @@ class EventViewModelTest {
             secondKey!! > firstKey!!
         )
         assertEquals(setOf(5), viewModel.uiState.value.restoredItemKeys.keys)
+    }
+
+    @Test
+    fun `restoration key auto-expires after TTL`() = runTest(dispatcher) {
+        dao.insertItem(item(9, "temp-key"))
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.deleteItem(item(9, "temp-key"))
+        advanceTimeBy(250)
+        advanceUntilIdle()
+        viewModel.undoDelete()
+        // Do not advanceUntilIdle here - that would drain the TTL delay immediately.
+        runCurrent()
+
+        assertTrue(
+            "key must be present immediately after undo (LazyColumn re-key window)",
+            viewModel.uiState.value.restoredItemKeys.containsKey(9)
+        )
+
+        advanceTimeBy(EventViewModel.RESTORATION_KEY_TTL_MS)
+        runCurrent()
+
+        assertTrue(
+            "key must be cleared after TTL so restoredItemKeys does not leak",
+            viewModel.uiState.value.restoredItemKeys.isEmpty()
+        )
     }
 
     @Test
