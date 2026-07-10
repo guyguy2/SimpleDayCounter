@@ -20,22 +20,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import org.koin.compose.koinInject
 
 /**
  * A reusable component for adding new custom categories.
  *
+ * @param dataStoreManager DataStoreManager instance for storing the new category (passed from screen root)
  * @param onCategoryAdded Callback invoked when a new category is successfully added
  * @param onCancel Callback invoked when the user cancels adding a category
  * @param placeholder Optional placeholder text for the input field
- * @param dataStoreManager DataStoreManager instance for storing the new category
  */
 @Composable
 fun AddCategoryInput(
+    dataStoreManager: DataStoreManager,
     onCategoryAdded: (String) -> Unit = {},
     onCancel: () -> Unit = {},
     placeholder: String = "Enter a new category name",
-    dataStoreManager: DataStoreManager = koinInject()
 ) {
     var categoryText by remember { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }

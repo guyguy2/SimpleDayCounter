@@ -143,8 +143,9 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // Add a helper function to format dates according to the selected preference
-    fun formatDate(date: Date, format: DateFormat): String {
-        return SimpleDateFormat(format.formatPattern, Locale.getDefault()).format(date)
-    }
+}
+
+/** Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). */
+fun formatDate(date: Date, format: DateFormat): String {
+    return SimpleDateFormat(format.formatPattern, Locale.getDefault()).format(date)
 }

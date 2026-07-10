@@ -164,9 +164,10 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
         }
     }
 
-    // Get all category names (both default and custom)
+    // Get all category names (both default and custom); inject at screen root (P1-1)
     val dataStoreManager = koinInject<DataStoreManager>()
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
+    val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
     val allCategories = remember(customCategories) {
         defaultCategories + customCategories.toList() + "Add Custom..."
     }
@@ -508,6 +509,8 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             key(item.id, restorationKey) {
                                 SwipeToDeleteItem(
                                     item = item,
+                                    wasUndone = uiState.restoredItemKeys.containsKey(item.id),
+                                    isVibrationEnabled = isVibrationEnabled,
                                     onDelete = { viewModel.deleteItem(item) },
                                     onClick = {
                                         selectedItemId = item.id
@@ -531,6 +534,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     sheetState = bottomSheetState
                 ) {
                     AddEventBottomSheet(
+                        dataStoreManager = dataStoreManager,
                         onDismiss = { setShowAddEventSheet(false) },
                         onSave = { name, date, category, emoji ->
                             viewModel.saveItem(
@@ -554,6 +558,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                 ) {
                     EditEventScreen(
                         item = selectedItem,
+                        dataStoreManager = dataStoreManager,
                         onSave = { item ->
                             viewModel.updateItem(item)
                             setShowEditEventSheet(false)
@@ -575,19 +580,12 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
 @Composable
 fun SwipeToDeleteItem(
     item: Item,
+    wasUndone: Boolean,
+    isVibrationEnabled: Boolean,
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
-    val viewModel = koinViewModel<EventViewModel>()
-    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val dataStoreManager = koinInject<DataStoreManager>()
-    val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
-
-    // Track if this specific item was recently restored
-    val wasUndone = remember(uiState.restoredItemKeys) {
-        uiState.restoredItemKeys.containsKey(item.id)
-    }
 
     var isRemoved by remember { mutableStateOf(false) }
 

@@ -171,6 +171,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                     // Add category input field when shown
                     if (showAddCategoryInput) {
                         AddCategoryInput(
+                            dataStoreManager = dataStoreManager,
                             onCategoryAdded = { newCategory ->
                                 // Category was successfully added
                                 showAddCategoryInput = false
@@ -219,6 +220,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                 // Show the add category input if enabled
                 if (showAddCategoryInput) {
                     AddCategoryInput(
+                        dataStoreManager = dataStoreManager,
                         onCategoryAdded = { newCategory ->
                             // Category was successfully added
                             showAddCategoryInput = false
