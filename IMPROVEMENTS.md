@@ -604,3 +604,13 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - F-4 toolchain bump / F-5 polish when convenient.
 - Device smoke-install (carried over since wave 4).
 
+
+### Next Session Resume (post Wave 9) — canonical
+
+- **Baseline:** assembleDebug + **33/33** unit tests. P1-1 Koin hoist, F-2 restoration TTL, F-3 dead code done.
+- **Do next (pick one):**
+  1. **P2-7** type-safe Compose Navigation routes
+  2. F-4 toolchain / F-5 polish items still open in this file
+  3. Device smoke-install of R8 release APK (carried since wave 4)
+- **Resume prompt:** Read Wave 8–9 sessions. Prefer P2-7 or remaining F-items with clear acceptance criteria.
+
