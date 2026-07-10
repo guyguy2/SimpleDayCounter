@@ -605,12 +605,37 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - Device smoke-install (carried over since wave 4).
 
 
-### Next Session Resume (post Wave 9) — canonical
+### Next Session Resume (post Wave 9) — superseded by Wave 10 below
 
-- **Baseline:** assembleDebug + **33/33** unit tests. P1-1 Koin hoist, F-2 restoration TTL, F-3 dead code done.
+---
+
+## Session 2026-07-10 - Wave 10 (P2-7 type-safe Navigation)
+
+### Status
+- P2-7 (type-safe Compose Navigation routes): DONE.
+  - Added Kotlin Serialization plugin (`org.jetbrains.kotlin.plugin.serialization` aligned with Kotlin `2.1.10`) and `kotlinx-serialization-json` `1.8.1` via version catalog; applied in root (apply false) + `:app`.
+  - Replaced string-based `sealed class Screen(val route: String)` with `@Serializable data object` destinations under `sealed interface Screen` (`Splash`, `Main`, `Settings`, `CategoryManagement`).
+  - `AppNavigation`: `composable<Screen.X>()`, `startDestination = Screen.Splash|Main`, `navigate(Screen.Main)`, `popUpTo<Screen.Splash>`, and splash enter transition via `NavDestination.hasRoute<Screen.Splash>()` instead of string route equality.
+  - Call sites updated: `MainScreen` → `navigate(Screen.Settings)`, `SettingsScreen` / `CategorySelector` → `navigate(Screen.CategoryManagement)`. No remaining `.route` string usage.
+  - R8: proguard keeps for `com.happypuppy.daycounter.navigation.**` serializers (type-safe routes under minify).
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest --no-daemon` -> `BUILD SUCCESSFUL in 4m 12s`.
+- **33/33** green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 9). Unchanged coverage vs wave 9.
+- Device R8 smoke-install still skipped (no device).
+
+### Next
+- F-4 toolchain bump / F-5 polish (vibrator util + DateFormat dropdown anchor).
+- P2-8 splash double-`delay` + illusory `startDestination` mutation (related nav cleanup; not required for P2-7).
+- Device smoke-install of R8 release APK (carried since wave 4).
+
+### Next Session Resume (post Wave 10) — canonical
+
+- **Baseline:** assembleDebug + **33/33** unit tests. P2-7 type-safe Navigation done.
 - **Do next (pick one):**
-  1. **P2-7** type-safe Compose Navigation routes
-  2. F-4 toolchain / F-5 polish items still open in this file
-  3. Device smoke-install of R8 release APK (carried since wave 4)
-- **Resume prompt:** Read Wave 8–9 sessions. Prefer P2-7 or remaining F-items with clear acceptance criteria.
+  1. **F-5** polish (shared `vibrate` util + fix `DateFormatSetting` DropdownMenu anchor) — small, clear acceptance
+  2. **F-4** coordinated toolchain bump (Compose BOM / Kotlin / AGP / Room / Koin) — larger; full `assembleRelease` verify
+  3. **P2-8** splash single source of truth (pairs with nav after P2-7)
+  4. Device smoke-install of R8 release APK (carried since wave 4)
+- **Resume prompt:** Read Wave 9–10. Prefer F-5 or P2-8 for a small chunk; F-4 needs a full verify pipeline.
 

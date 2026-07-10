@@ -86,11 +86,18 @@
 
 # ---------------------------------------------------------------------------
 # AndroidX Navigation Compose
-# Navigation uses reflection to instantiate NavType arguments; string-based
-# routes are otherwise safe under R8.
+# Type-safe @Serializable routes (P2-7) are encoded via kotlinx.serialization;
+# keep route types and Navigation internals so R8 does not strip serializers.
 # ---------------------------------------------------------------------------
 -keepnames class androidx.navigation.** { *; }
 -dontwarn androidx.navigation.**
+-keep class com.happypuppy.daycounter.navigation.** { *; }
+-keepclassmembers class com.happypuppy.daycounter.navigation.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.happypuppy.daycounter.navigation.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
 # ---------------------------------------------------------------------------
 # Jetpack Compose
