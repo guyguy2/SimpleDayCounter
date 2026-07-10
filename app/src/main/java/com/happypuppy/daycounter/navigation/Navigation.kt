@@ -1,8 +1,21 @@
 package com.happypuppy.daycounter.navigation
 
-sealed class Screen(val route: String) {
-    object Splash : Screen("splash_screen")
-    object Main : Screen("main_screen")
-    object Settings : Screen("settings_screen")
-    object CategoryManagement : Screen("category_management_screen")
+import kotlinx.serialization.Serializable
+
+/**
+ * Type-safe Compose Navigation routes (Navigation 2.8+ / P2-7).
+ * Each destination is a `@Serializable` object used with `composable<T>()` and `navigate(T)`.
+ */
+sealed interface Screen {
+    @Serializable
+    data object Splash : Screen
+
+    @Serializable
+    data object Main : Screen
+
+    @Serializable
+    data object Settings : Screen
+
+    @Serializable
+    data object CategoryManagement : Screen
 }

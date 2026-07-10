@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -36,10 +37,9 @@ fun AppNavigation() {
 
     NavHost(
         navController = navController,
-        startDestination = if (showSplash) Screen.Splash.route else Screen.Main.route
+        startDestination = if (showSplash) Screen.Splash else Screen.Main
     ) {
-        composable(
-            route = Screen.Splash.route,
+        composable<Screen.Splash>(
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,
@@ -70,21 +70,21 @@ fun AppNavigation() {
             LaunchedEffect(key1 = true) {
                 delay(1500)
                 if (BuildConfig.DEBUG) Log.d("Navigation", "Navigating from Splash to Main")
-                navController.navigate(Screen.Main.route) {
-                    popUpTo(Screen.Splash.route) { inclusive = true }
+                navController.navigate(Screen.Main) {
+                    popUpTo<Screen.Splash> { inclusive = true }
                 }
             }
         }
 
-        composable(
-            route = Screen.Main.route,
+        composable<Screen.Main>(
             enterTransition = {
-                when (initialState.destination.route) {
-                    Screen.Splash.route -> slideIntoContainer(
+                if (initialState.destination.hasRoute<Screen.Splash>()) {
+                    slideIntoContainer(
                         towards = AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(animDuration)
                     )
-                    else -> slideIntoContainer(
+                } else {
+                    slideIntoContainer(
                         towards = AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(animDuration)
                     )
@@ -112,8 +112,7 @@ fun AppNavigation() {
             MainScreen(navController = navController)
         }
 
-        composable(
-            route = Screen.Settings.route,
+        composable<Screen.Settings>(
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,
@@ -142,8 +141,7 @@ fun AppNavigation() {
             SettingsScreen(navController = navController)
         }
 
-        composable(
-            route = Screen.CategoryManagement.route,
+        composable<Screen.CategoryManagement>(
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,

@@ -105,7 +105,7 @@ fun CategorySelector(
                         onClick = {
                             if (category == "Add Custom...") {
                                 // Navigate to the Category Management screen instead of showing input
-                                navController?.navigate(Screen.CategoryManagement.route)
+                                navController?.navigate(Screen.CategoryManagement)
                             } else {
                                 onCategorySelected(category)
                             }

@@ -141,7 +141,7 @@ fun CategoryManagementSetting(navController: NavHostController) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { navController.navigate(Screen.CategoryManagement.route) }
+            .clickable { navController.navigate(Screen.CategoryManagement) }
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

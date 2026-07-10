@@ -420,7 +420,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         }
                     }
 
-                    IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                    IconButton(onClick = { navController.navigate(Screen.Settings) }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings"
