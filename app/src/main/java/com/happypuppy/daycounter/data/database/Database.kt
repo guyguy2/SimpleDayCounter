@@ -35,9 +35,6 @@ interface ItemDao {
 
     @Delete
     suspend fun deleteItem(item: Item)
-
-    @Query("DELETE FROM items")
-    suspend fun deleteAllItems()
 }
 
 @Database(entities = [Item::class], version = 4, exportSchema = true)
@@ -50,5 +47,4 @@ class ItemRepository(private val itemDao: ItemDao) {
     fun getAllItems(): Flow<List<Item>> = itemDao.getAllItems()
     suspend fun insertItem(item: Item) = itemDao.insertItem(item)
     suspend fun deleteItem(item: Item) = itemDao.deleteItem(item)
-    suspend fun deleteAllItems() = itemDao.deleteAllItems()
 }

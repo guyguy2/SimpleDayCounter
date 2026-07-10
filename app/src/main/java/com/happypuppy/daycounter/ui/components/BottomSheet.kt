@@ -64,7 +64,6 @@ fun AddEventBottomSheet(
 
     // Use BottomSheetStateSaver for the date picker state
     val (showDatePicker, setShowDatePicker) = rememberSaveableSheetState("addEventDatePicker", false)
-    var isAdding by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     // Debug statement to confirm when date picker state changes
     LaunchedEffect(showDatePicker) {

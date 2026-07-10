@@ -517,8 +517,8 @@ Review-only session: no code changes. Re-read the full source tree against the o
 | # | Issue | File(s) | Effort | Notes |
 |---|-------|---------|--------|-------|
 | F-1 | **DONE (wave 9).** **Edit-sheet restore bug.** `selectedItemData` is declared saveable but never written: the card click at `MainScreen.kt:518` sets the non-saveable `selectedItem` directly, and `Item.toData()` (`FilterStateSaver.kt:23`) has zero callers. After process death or config change, `showEditEventSheet` restores to `true` while the item is `null`, so the sheet silently fails to show and the flag stays stale. The whole `SelectedItemData` mechanism is dead weight | `MainScreen.kt:123-132,518`, `FilterStateSaver.kt` | S | Drop `SelectedItemData` entirely; save just the item ID and look it up in `uiState.items` (the section 4 suggestion). Fix alongside P1-1 since both touch the same `MainScreen` region |
-| F-2 | **Undo bookkeeping leaks.** `clearRestorationKey` (`EventViewModel.kt:110`) is tested but has no production caller, so every undo adds a `restoredItemKeys` entry that lives for the app's lifetime. The list is also double-keyed: `items(key = ...)` already uses `"${id}_$restorationKey"`, making the inner `key(item.id, restorationKey)` wrapper redundant | `EventViewModel.kt:110`, `MainScreen.kt:505-513` | S | Call `clearRestorationKey` after the restore animation (or auto-expire entries); drop the inner `key {}` block |
-| F-3 | **Dead code sweep.** `deleteAllItems` (`EventViewModel.kt:126` + repository + DAO chain) has no UI caller; `isAdding` in `BottomSheet.kt:68` is declared but never set or read (decayed further since the section 13 note - the `AddCategoryInput.kt` one is fine) | `EventViewModel.kt:126`, `Database.kt:40,53`, `BottomSheet.kt:68` | S | Delete all three, or hook `deleteAllItems` to a settings action if wanted |
+| F-2 | **DONE (wave 9 F-2/F-3).** **Undo bookkeeping leaks.** `clearRestorationKey` was tested but had no production path; every undo left a `restoredItemKeys` entry for the process lifetime. List was also double-keyed (`items(key=...)` plus inner `key {}`) | `EventViewModel.kt`, `MainScreen.kt` | S | Auto-expire keys after `RESTORATION_KEY_TTL_MS` with timestamp identity check; drop inner `key {}` |
+| F-3 | **DONE (wave 9 F-2/F-3).** **Dead code sweep.** `deleteAllItems` (VM + repository + DAO) had no UI caller; `isAdding` in `BottomSheet.kt` was unused (`AddCategoryInput.kt` remains legitimate) | `EventViewModel.kt`, `Database.kt`, `BottomSheet.kt` | S | Removed unused chain + dead state |
 | F-4 | **Stale toolchain (June 2026).** Compose BOM `2025.02.00`, Kotlin `2.1.10`, AGP `8.9.0`, Room `2.6.1` (2.7+ stable), Koin `3.5.0` (folds in P2-11). Build prints an "SDK XML version 4" mismatch warning from old command-line tools | `gradle/libs.versions.toml` | M | One coordinated bump wave; rerun full verify pipeline including `assembleRelease` |
 | F-5 | **Minor polish.** (a) Vibrator API duplicated in two styles: `MainScreen.kt:624` casts `VIBRATOR_MANAGER_SERVICE`, `SettingsScreen.kt:270` uses `getSystemService(context, Vibrator::class.java)` - same 100ms one-shot; extract one `vibrate(context)` util. (b) `DateFormatSetting`'s `DropdownMenu` (`SettingsScreen.kt:537`) sits outside its anchor `Box`, so it opens at the parent corner instead of under the field | `MainScreen.kt:624`, `SettingsScreen.kt:270,537` | S | Cosmetic/consistency only; batch with any nearby wave |
 
@@ -576,8 +576,31 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - `rg 'koinInject|koinViewModel' app/src` shows only screen/root sites (no leaf components).
 
 ### Next
-- F-2 (`restoredItemKeys` leak + redundant inner `key {}`).
-- F-3 dead-code sweep.
+- ~~F-2 (`restoredItemKeys` leak + redundant inner `key {}`)~~ DONE (session below).
+- ~~F-3 dead-code sweep~~ DONE (session below).
 - P2-7 type-safe Compose Navigation (larger; after remaining F-items).
 - Device smoke-install (carried over).
+
+---
+
+## Session 2026-07-10 - Wave 9 (F-2 + F-3)
+
+### Status
+- F-2 (`restoredItemKeys` leak + redundant inner `key {}`): DONE.
+  - `undoDelete` now stamps a restoration key, re-inserts the item, then `delay(RESTORATION_KEY_TTL_MS = 300)` and removes the entry only if the stored timestamp still matches (a second undo of the same id is not clobbered by the first TTL).
+  - `clearRestorationKey` remains for explicit cleanup; shared private `removeRestorationKey` no-ops when the id is absent.
+  - `MainScreen` LazyColumn keeps `items(key = "${id}_$restorationKey")` only; dropped the redundant inner `key(item.id, restorationKey) { ... }` and its import.
+- F-3 (dead code): DONE.
+  - Removed `deleteAllItems` from `EventViewModel`, `ItemRepository`, `ItemDao`, and `FakeItemDao` (no UI caller).
+  - Removed unused `isAdding` from `AddEventBottomSheet` (`BottomSheet.kt`). Left `AddCategoryInput.isAdding` (actually gates the add button).
+
+### Verify
+- Baseline then post-fix: `./gradlew assembleDebug testDebugUnitTest --no-daemon` -> `BUILD SUCCESSFUL`.
+- 33/33 green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 9 including new `restoration key auto-expires after TTL`).
+- Existing restore-key assertions use `runCurrent()` after undo so they do not drain the TTL via `advanceUntilIdle()`.
+
+### Next
+- P2-7 type-safe Compose Navigation (optional; F-2/F-3 closed).
+- F-4 toolchain bump / F-5 polish when convenient.
+- Device smoke-install (carried over since wave 4).
 

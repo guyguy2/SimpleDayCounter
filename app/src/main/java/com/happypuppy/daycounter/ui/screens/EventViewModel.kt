@@ -90,30 +90,43 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
             _uiState.value.lastDeletedItem?.let { deletedItem ->
                 if (BuildConfig.DEBUG) Log.d(TAG, "Undoing delete for item ${deletedItem.id}")
 
-                // Create a new map with this item's unique restoration key (current time)
+                // Fresh timestamp forces LazyColumn to remount the row so swipe state resets.
+                val restorationKey = System.currentTimeMillis()
                 val updatedRestoredKeys = _uiState.value.restoredItemKeys.toMutableMap()
-                updatedRestoredKeys[deletedItem.id] = System.currentTimeMillis()
+                updatedRestoredKeys[deletedItem.id] = restorationKey
 
-                // Update UI state first with the new key
                 _uiState.value = _uiState.value.copy(
                     lastDeletedItem = null,
                     showUndoSnackbar = false,
                     restoredItemKeys = updatedRestoredKeys
                 )
 
-                // Insert the item back to the database; the Flow will emit.
                 repository.insertItem(deletedItem)
+
+                // Auto-expire so the map does not grow for the process lifetime.
+                // Only remove if this exact key is still present (a later undo of the
+                // same id would have replaced it with a newer timestamp).
+                delay(RESTORATION_KEY_TTL_MS)
+                val stillCurrent = _uiState.value.restoredItemKeys[deletedItem.id]
+                if (stillCurrent == restorationKey) {
+                    removeRestorationKey(deletedItem.id)
+                }
             }
         }
     }
 
     fun clearRestorationKey(itemId: Int) {
         viewModelScope.launch {
-            val currentKeys = _uiState.value.restoredItemKeys.toMutableMap()
-            currentKeys.remove(itemId)
-            _uiState.value = _uiState.value.copy(restoredItemKeys = currentKeys)
-            if (BuildConfig.DEBUG) Log.d(TAG, "Cleared restoration key for item $itemId")
+            removeRestorationKey(itemId)
         }
+    }
+
+    private fun removeRestorationKey(itemId: Int) {
+        if (!_uiState.value.restoredItemKeys.containsKey(itemId)) return
+        val currentKeys = _uiState.value.restoredItemKeys.toMutableMap()
+        currentKeys.remove(itemId)
+        _uiState.value = _uiState.value.copy(restoredItemKeys = currentKeys)
+        if (BuildConfig.DEBUG) Log.d(TAG, "Cleared restoration key for item $itemId")
     }
 
     fun dismissUndoSnackbar() {
@@ -123,13 +136,10 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
         )
     }
 
-    fun deleteAllItems() {
-        viewModelScope.launch {
-            repository.deleteAllItems()
-        }
-    }
-
-    private companion object {
+    companion object {
         private const val TAG = "EventViewModel"
+
+        /** How long a restoration key stays in uiState after undo (for LazyColumn re-key). */
+        const val RESTORATION_KEY_TTL_MS = 300L
     }
 }
