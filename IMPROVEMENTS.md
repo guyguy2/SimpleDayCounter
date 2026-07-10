@@ -553,8 +553,31 @@ Review-only session: no code changes. Re-read the full source tree against the o
 
 ### Next (start here next session)
 - F-2 (`restoredItemKeys` leak + redundant inner `key {}`) - same `MainScreen` region, natural follow-up. Highest-value open item alongside P1-1.
-- P1-1 Koin hoist (`SwipeToDeleteItem` second `koinViewModel`, `formatDate` lift, leaf `koinInject` removal).
+- ~~P1-1 Koin hoist~~ DONE (wave 8 carry-over / session below).
 - F-3 dead-code sweep (`deleteAllItems` chain, `isAdding` in `BottomSheet.kt`).
 - F-4 toolchain bump / F-5 polish - lower priority, batch when convenient.
 - Smoke-install release APK on device (carried over since wave 4); now also covers the F-1 rotation check.
+
+---
+
+## Session 2026-07-10 - Wave 8 carry-over (P1-1)
+
+### Status
+- P1-1 (`koinInject` / `koinViewModel` in leaf composables): DONE.
+  - Lifted pure `formatDate(date, format)` to a top-level function in `DataStoreManager.kt`; removed the instance method. Call sites (`EventCard`, `BottomSheet`, `EditEventScreen`, `SettingsScreen`) use the free function.
+  - `EventCard` no longer touches Koin; reads `LocalDateFormat` + `formatDate`.
+  - `SwipeToDeleteItem` no longer calls `koinViewModel` / `koinInject`. Parent `MainScreen` collects `isVibrationEnabled` once and passes `wasUndone` + `isVibrationEnabled` as params (also stops per-row full `uiState` collection).
+  - `CategorySelector` / `AddCategoryInput` require `DataStoreManager` (no default `koinInject()`).
+  - `AddEventBottomSheet` / `EditEventScreen` take `dataStoreManager` from `MainScreen`; date format via `LocalDateFormat`.
+  - Remaining `koinInject`/`koinViewModel` only at roots: `MainActivity`, `Theme`, `MainScreen`, `SettingsScreen`, `CategoryManagementScreen`.
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest` -> `BUILD SUCCESSFUL`. 32/32 green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 8).
+- `rg 'koinInject|koinViewModel' app/src` shows only screen/root sites (no leaf components).
+
+### Next
+- F-2 (`restoredItemKeys` leak + redundant inner `key {}`).
+- F-3 dead-code sweep.
+- P2-7 type-safe Compose Navigation (larger; after remaining F-items).
+- Device smoke-install (carried over).
 
