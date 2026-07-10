@@ -2,8 +2,6 @@ package com.happypuppy.daycounter.ui.screens
 
 import android.content.Intent
 import android.media.RingtoneManager
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,7 +58,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.net.toUri
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.data.preferences.AppTheme
@@ -69,6 +66,7 @@ import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.util.AppVersionInfo
+import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.util.Date
@@ -266,15 +264,8 @@ fun VibrationSetting(dataStoreManager: DataStoreManager) {
             scope.launch {
                 dataStoreManager.setVibrateEnabled(enabled)
 
-                // Demonstration vibration when enabled
                 if (enabled) {
-                    val vibrator = getSystemService(context, Vibrator::class.java)
-                    vibrator?.vibrate(
-                        VibrationEffect.createOneShot(
-                            100,
-                            VibrationEffect.DEFAULT_AMPLITUDE
-                        )
-                    )
+                    vibrate(context)
                 }
             }
         }
@@ -501,6 +492,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
             // Format preview
             val formattedDate = formatDate(sampleDate, currentFormat)
 
+            // DropdownMenu must be a child of this Box so it anchors under the field
             Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = currentFormat.displayName,
@@ -516,56 +508,48 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                     readOnly = true
                 )
 
-                // Invisible clickable overlay that covers the entire text field
                 Box(
                     modifier = Modifier
                         .matchParentSize()
                         .clickable(onClick = { showFormatOptions = true })
                 )
-            }
 
+                DropdownMenu(
+                    expanded = showFormatOptions,
+                    onDismissRequest = { showFormatOptions = false },
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    DateFormat.entries.forEach { format ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(format.displayName)
+                                    Text(
+                                        text = "Example: ${formatDate(sampleDate, format)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            onClick = {
+                                scope.launch {
+                                    dataStoreManager.setDateFormat(format)
+                                }
+                                showFormatOptions = false
+                            },
+                            trailingIcon = if (currentFormat == format) {
+                                { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                            } else null
+                        )
+                    }
+                }
+            }
 
             Text(
                 text = "Preview: $formattedDate",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-            )
-        }
-    }
-
-    // Date format dropdown
-    DropdownMenu(
-        expanded = showFormatOptions,
-        onDismissRequest = { showFormatOptions = false },
-        modifier = Modifier.fillMaxWidth(0.9f)
-    ) {
-        DateFormat.entries.forEach { format ->
-            DropdownMenuItem(
-                text = {
-                    Column {
-                        Text(format.displayName)
-                        Text(
-                            text = "Example: ${
-                                formatDate(
-                                    sampleDate,
-                                    format
-                                )
-                            }",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                onClick = {
-                    scope.launch {
-                        dataStoreManager.setDateFormat(format)
-                    }
-                    showFormatOptions = false
-                },
-                trailingIcon = if (currentFormat == format) {
-                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
-                } else null
             )
         }
     }
