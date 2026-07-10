@@ -26,7 +26,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -38,9 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.data.preferences.DateFormat
+import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.screens.rememberSaveableSheetState
-import org.koin.compose.koinInject
+import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.TimeZone
@@ -48,12 +47,12 @@ import java.util.TimeZone
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventBottomSheet(
+    dataStoreManager: DataStoreManager,
     onDismiss: () -> Unit,
     onSave: (name: String, targetDate: Date, category: String, emoji: String) -> Unit,
     navController: NavController? = null
 ) {
-    val dataStoreManager = koinInject<DataStoreManager>()
-    val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
+    val dateFormat = LocalDateFormat.current
 
     // Use rememberSaveable to preserve state across configuration changes
     var eventName by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
@@ -126,7 +125,7 @@ fun AddEventBottomSheet(
         // Target date field with the OutlinedTextField but fully clickable
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
-                value = dataStoreManager.formatDate(targetDate, dateFormat),
+                value = formatDate(targetDate, dateFormat),
                 onValueChange = { /* readonly */ },
                 label = { Text("Target Date") },
                 modifier = Modifier.fillMaxWidth(),
@@ -158,6 +157,7 @@ fun AddEventBottomSheet(
         CategorySelector(
             selectedCategory = selectedCategory,
             onCategorySelected = { category -> selectedCategory = category },
+            dataStoreManager = dataStoreManager,
             modifier = Modifier.fillMaxWidth(),
             navController = navController
         )

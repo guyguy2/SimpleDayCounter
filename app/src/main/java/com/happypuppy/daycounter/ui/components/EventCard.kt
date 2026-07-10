@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happypuppy.daycounter.data.database.Item
-import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.DarkCardPink
 import com.happypuppy.daycounter.ui.theme.DarkCardPurple
@@ -46,7 +46,6 @@ import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.isColorBright
-import org.koin.compose.koinInject
 
 @Composable
 fun EventCard(
@@ -56,13 +55,9 @@ fun EventCard(
     val daysLeft = calculateDaysLeft(item.targetDate)
 
     // Theme + date format are resolved once at SimpleDayCounterTheme; consume them here instead
-    // of re-collecting the DataStore flows per card (IMPROVEMENTS.md P1-5).
+    // of re-collecting the DataStore flows per card (IMPROVEMENTS.md P1-5 / P1-1).
     val isDarkTheme = LocalIsDarkTheme.current
     val dateFormat = LocalDateFormat.current
-
-    // formatDate is a pure helper on DataStoreManager; we keep the inject for that single call.
-    // Removing this remaining koinInject is tracked separately as P1-1.
-    val dataStoreManager = koinInject<DataStoreManager>()
 
     // Calculate the appropriate background color based on days left and theme
     val backgroundColor = if (isDarkTheme) {
@@ -155,7 +150,7 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(8.dp)) // Additional spacing
 
                 // Date with the selected format
-                val formattedDate = dataStoreManager.formatDate(item.targetDate, dateFormat)
+                val formattedDate = formatDate(item.targetDate, dateFormat)
 
                 Text(
                     text = formattedDate,

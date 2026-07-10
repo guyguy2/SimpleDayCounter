@@ -66,6 +66,7 @@ import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
+import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.util.AppVersionInfo
 import kotlinx.coroutines.launch
@@ -498,7 +499,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Format preview
-            val formattedDate = dataStoreManager.formatDate(sampleDate, currentFormat)
+            val formattedDate = formatDate(sampleDate, currentFormat)
 
             Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
@@ -546,7 +547,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                         Text(format.displayName)
                         Text(
                             text = "Example: ${
-                                dataStoreManager.formatDate(
+                                formatDate(
                                     sampleDate,
                                     format
                                 )

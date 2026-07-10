@@ -17,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
@@ -26,7 +25,6 @@ import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
-import org.koin.compose.koinInject
 
 // Predefined default categories
 val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
@@ -35,14 +33,13 @@ val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
 fun CategorySelector(
     selectedCategory: String,
     onCategorySelected: (String) -> Unit,
+    dataStoreManager: DataStoreManager,
     modifier: Modifier = Modifier,
     navController: NavController? = null,
-    dataStoreManager: DataStoreManager = koinInject()
 ) {
     var showCategoryDropdown by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
-    // Get custom categories from DataStore
+    // Get custom categories from DataStore (injected at screen root - P1-1)
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
 
     // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
