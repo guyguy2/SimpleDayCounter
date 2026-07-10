@@ -520,7 +520,7 @@ Review-only session: no code changes. Re-read the full source tree against the o
 | F-2 | **DONE (wave 9 F-2/F-3).** **Undo bookkeeping leaks.** `clearRestorationKey` was tested but had no production path; every undo left a `restoredItemKeys` entry for the process lifetime. List was also double-keyed (`items(key=...)` plus inner `key {}`) | `EventViewModel.kt`, `MainScreen.kt` | S | Auto-expire keys after `RESTORATION_KEY_TTL_MS` with timestamp identity check; drop inner `key {}` |
 | F-3 | **DONE (wave 9 F-2/F-3).** **Dead code sweep.** `deleteAllItems` (VM + repository + DAO) had no UI caller; `isAdding` in `BottomSheet.kt` was unused (`AddCategoryInput.kt` remains legitimate) | `EventViewModel.kt`, `Database.kt`, `BottomSheet.kt` | S | Removed unused chain + dead state |
 | F-4 | **Stale toolchain (June 2026).** Compose BOM `2025.02.00`, Kotlin `2.1.10`, AGP `8.9.0`, Room `2.6.1` (2.7+ stable), Koin `3.5.0` (folds in P2-11). Build prints an "SDK XML version 4" mismatch warning from old command-line tools | `gradle/libs.versions.toml` | M | One coordinated bump wave; rerun full verify pipeline including `assembleRelease` |
-| F-5 | **Minor polish.** (a) Vibrator API duplicated in two styles: `MainScreen.kt:624` casts `VIBRATOR_MANAGER_SERVICE`, `SettingsScreen.kt:270` uses `getSystemService(context, Vibrator::class.java)` - same 100ms one-shot; extract one `vibrate(context)` util. (b) `DateFormatSetting`'s `DropdownMenu` (`SettingsScreen.kt:537`) sits outside its anchor `Box`, so it opens at the parent corner instead of under the field | `MainScreen.kt:624`, `SettingsScreen.kt:270,537` | S | Cosmetic/consistency only; batch with any nearby wave |
+| F-5 | **DONE (wave 11).** **Minor polish.** (a) Vibrator API duplicated in two styles - extract one `vibrate(context)` util. (b) `DateFormatSetting`'s `DropdownMenu` sat outside its anchor `Box` | `Utils.kt`, `MainScreen.kt`, `SettingsScreen.kt` | S | Shared util + dropdown re-anchored under format field |
 
 ### Carried-over items confirmed still open in code (highest value first)
 - P1-1 - `koinViewModel<EventViewModel>()` inside `SwipeToDeleteItem` (`MainScreen.kt:586`) creates a second VM lookup and collects the entire `uiState` per row just for `restoredItemKeys`. Plus `koinInject` in `EventCard`, `CategorySelector`, `AddCategoryInput`, `BottomSheet`, `CategoryManagementScreen`. `formatDate` (`DataStoreManager.kt:147`) is pure - lift to a top-level function, then `EventCard` needs zero Koin (it already reads `LocalDateFormat`). Unblocks `@Preview` everywhere.
@@ -625,17 +625,39 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - Device R8 smoke-install still skipped (no device).
 
 ### Next
-- F-4 toolchain bump / F-5 polish (vibrator util + DateFormat dropdown anchor).
+- ~~F-5 polish (vibrator util + DateFormat dropdown anchor)~~ DONE (wave 11).
+- F-4 toolchain bump when convenient.
 - P2-8 splash double-`delay` + illusory `startDestination` mutation (related nav cleanup; not required for P2-7).
-- Device smoke-install of R8 release APK (carried since wave 4).
+- Device smoke-install of R8 release APK (carried since wave 4); wave 11 covered **debug** smoke on emulator.
 
-### Next Session Resume (post Wave 10) — canonical
+### Next Session Resume (post Wave 10) — superseded by Wave 11 below
 
-- **Baseline:** assembleDebug + **33/33** unit tests. P2-7 type-safe Navigation done.
+---
+
+## Session 2026-07-10 - Wave 11 (F-5 polish + debug smoke)
+
+### Status
+- F-5 (minor polish): DONE.
+  - (a) Extracted shared `vibrate(context, durationMs = 100)` in `util/Utils.kt` using `VibratorManager` (minSdk 31). `MainScreen` swipe-delete and `SettingsScreen` VibrationSetting demo both call it; removed divergent Vibrator/VibratorManager inline code and unused imports.
+  - (b) Moved `DateFormatSetting`'s `DropdownMenu` inside the format field's anchor `Box` so the menu opens under the field instead of at the parent corner.
+- Debug install smoke on `emulator-5554`: `adb install -r` of `app-debug.apk` Success; `MainActivity` launched and `topResumedActivity` confirmed (pid live). Prefer debug over inventing release signing for this wave.
+
+### Verify
+- `./gradlew assembleDebug testDebugUnitTest --no-daemon` -> `BUILD SUCCESSFUL in 2m 28s`.
+- **33/33** green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `EventViewModelTest` 9). Unchanged coverage vs wave 10.
+- Emulator: package `com.happypuppy.daycounter` installed; `MainActivity` resumed.
+
+### Next
+- F-4 coordinated toolchain bump (Compose BOM / Kotlin / AGP / Room / Koin) — full verify incl. `assembleRelease`.
+- P2-8 splash single source of truth (double-`delay` + illusory `startDestination` mutation).
+- Optional: R8 release APK smoke on device (carried; needs release signing if not already configured).
+
+### Next Session Resume (post Wave 11) — canonical
+
+- **Baseline:** assembleDebug + **33/33** unit tests. F-5 polish + debug emulator smoke done.
 - **Do next (pick one):**
-  1. **F-5** polish (shared `vibrate` util + fix `DateFormatSetting` DropdownMenu anchor) — small, clear acceptance
-  2. **F-4** coordinated toolchain bump (Compose BOM / Kotlin / AGP / Room / Koin) — larger; full `assembleRelease` verify
-  3. **P2-8** splash single source of truth (pairs with nav after P2-7)
-  4. Device smoke-install of R8 release APK (carried since wave 4)
-- **Resume prompt:** Read Wave 9–10. Prefer F-5 or P2-8 for a small chunk; F-4 needs a full verify pipeline.
+  1. **F-4** coordinated toolchain bump (Compose BOM / Kotlin / AGP / Room / Koin) — larger; full `assembleRelease` verify
+  2. **P2-8** splash single source of truth (pairs with nav after P2-7)
+  3. R8 release device/emulator smoke (if signing ready; else keep debug path)
+- **Resume prompt:** Read Wave 10–11. Prefer P2-8 for a small chunk; F-4 needs a full verify pipeline.
 

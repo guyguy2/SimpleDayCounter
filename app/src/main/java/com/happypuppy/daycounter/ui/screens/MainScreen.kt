@@ -1,8 +1,5 @@
 package com.happypuppy.daycounter.ui.screens
 
-import android.content.Context
-import android.os.VibrationEffect
-import android.os.VibratorManager
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -79,6 +76,7 @@ import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.util.calculateDaysLeft
+import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -610,17 +608,8 @@ fun SwipeToDeleteItem(
     LaunchedEffect(isRemoved) {
         if (isRemoved) {
             if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Item ${item.id} marked as removed, animating...")
-            // Vibrate if enabled
             if (isVibrationEnabled) {
-                val vibratorManager =
-                    context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                val vibrator = vibratorManager.defaultVibrator
-                vibrator.vibrate(
-                    VibrationEffect.createOneShot(
-                        100, // Duration in milliseconds
-                        VibrationEffect.DEFAULT_AMPLITUDE
-                    )
-                )
+                vibrate(context)
             }
             delay(200)
             if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")

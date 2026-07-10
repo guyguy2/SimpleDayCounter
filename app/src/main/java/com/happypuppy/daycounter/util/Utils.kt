@@ -3,9 +3,21 @@ package com.happypuppy.daycounter.util
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.VibratorManager
 import androidx.compose.ui.graphics.Color
 import java.util.Calendar
 import java.util.Date
+
+/** One-shot haptic feedback. minSdk 31 guarantees [VibratorManager]. */
+fun vibrate(context: Context, durationMs: Long = 100) {
+    val vibratorManager =
+        context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            ?: return
+    vibratorManager.defaultVibrator.vibrate(
+        VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE)
+    )
+}
 
 /**
  * Utility class to get app version information without direct BuildConfig dependency
