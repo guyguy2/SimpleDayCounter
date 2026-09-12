@@ -170,8 +170,9 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     val dataStoreManager = koinInject<DataStoreManager>()
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
     val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
+    // Filter menu lists real categories only; the "Add Custom..." entry belongs to CategorySelector.
     val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.toList() + "Add Custom..."
+        defaultCategories + customCategories.toList()
     }
 
     // Show undo snackbar when an item is deleted
