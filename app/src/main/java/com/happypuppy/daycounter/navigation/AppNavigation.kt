@@ -5,10 +5,6 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,24 +16,23 @@ import com.happypuppy.daycounter.ui.screens.SettingsScreen
 import com.happypuppy.daycounter.ui.screens.SplashScreen
 import kotlinx.coroutines.delay
 
+/** How long the splash destination stays visible before navigating to Main. */
+private const val SPLASH_DURATION_MS = 1500L
+
 @Composable
 fun AppNavigation() {
-    // Use rememberNavController with rememberSaveable to preserve navigation state
+    // rememberNavController saves and restores the back stack itself, so once the
+    // splash destination has navigated to Main (popping itself), a configuration
+    // change or process death restores Main directly. Splash is therefore the single
+    // fixed start destination and the splash composable owns the only timer (P2-8).
     val navController = rememberNavController()
-    var showSplash by rememberSaveable { mutableStateOf(true) }
-
-    // Simple splash screen delay
-    LaunchedEffect(key1 = true) {
-        delay(1500)
-        showSplash = false
-    }
 
     // Define animation durations and easing
     val animDuration = 400 // Animation duration in milliseconds
 
     NavHost(
         navController = navController,
-        startDestination = if (showSplash) Screen.Splash else Screen.Main
+        startDestination = Screen.Splash
     ) {
         composable<Screen.Splash>(
             enterTransition = {
@@ -68,7 +63,7 @@ fun AppNavigation() {
             SplashScreen()
 
             LaunchedEffect(key1 = true) {
-                delay(1500)
+                delay(SPLASH_DURATION_MS)
                 if (BuildConfig.DEBUG) Log.d("Navigation", "Navigating from Splash to Main")
                 navController.navigate(Screen.Main) {
                     popUpTo<Screen.Splash> { inclusive = true }
