@@ -1,7 +1,6 @@
 package com.happypuppy.daycounter.data.preferences
 
 import android.content.Context
-import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,12 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -117,22 +112,6 @@ class DataStoreManager(private val context: Context) {
         context.dataStore.edit { settings ->
             val currentCategories = settings[CUSTOM_CATEGORIES_KEY] ?: emptySet()
             settings[CUSTOM_CATEGORIES_KEY] = currentCategories + category
-        }
-    }
-
-    fun addCategoryAsync(category: String, onComplete: (Boolean) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                addCustomCategory(category)
-                withContext(Dispatchers.Main) {
-                    onComplete(true)
-                }
-            } catch (e: Exception) {
-                Log.e("CategoryAdd", "Failed to add category: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    onComplete(false)
-                }
-            }
         }
     }
 
