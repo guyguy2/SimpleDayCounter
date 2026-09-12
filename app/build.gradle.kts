@@ -95,11 +95,9 @@ dependencies {
     ksp(libs.room.compiler)
 //    implementation(libs.koin.compose.viewmodel)
     implementation (libs.androidx.material.icons.extended)
-    implementation(libs.androidx.material)
 
 
 
-    implementation(libs.androidx.datastore)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.navigation.compose)
     // Required by Navigation Compose type-safe @Serializable routes (P2-7).
