@@ -652,7 +652,7 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - P2-8 splash single source of truth (double-`delay` + illusory `startDestination` mutation).
 - Optional: R8 release APK smoke on device (carried; needs release signing if not already configured).
 
-### Next Session Resume (post Wave 11) — canonical
+### Next Session Resume (post Wave 11) — superseded by Wave 12 below
 
 - **Baseline:** assembleDebug + **33/33** unit tests. F-5 polish + debug emulator smoke done.
 - **Do next (pick one):**
@@ -661,3 +661,46 @@ Review-only session: no code changes. Re-read the full source tree against the o
   3. R8 release device/emulator smoke (if signing ready; else keep debug path)
 - **Resume prompt:** Read Wave 10–11. Prefer P2-8 for a small chunk; F-4 needs a full verify pipeline.
 
+---
+
+## Session 2026-09-12 - Wave 12 (P2-8, P1-4, filter state, P2-9, P2-5 partial)
+
+### Status
+- P2-8 (splash single source of truth): DONE - `6171b52`. `AppNavigation` no longer keeps a saveable `showSplash` flag with its own `delay(1500)` that flipped `startDestination` on an already-composed `NavHost`. `Screen.Splash` is the fixed start destination; the splash destination's `LaunchedEffect` (`delay(SPLASH_DURATION_MS)` then `navigate(Main) { popUpTo<Splash> { inclusive = true } }`) is the only timer. `rememberNavController` restores the back stack across rotation and process death, so Main is restored directly once Splash has popped itself. Removed the now-unused `getValue`/`setValue`/`mutableStateOf`/`rememberSaveable` imports.
+- P1-4 (unmanaged `CoroutineScope` in `addCategoryAsync`): DONE - `c66a8c5`. `DataStoreManager.addCategoryAsync` deleted along with its `Log`/`CoroutineScope`/`Dispatchers`/`launch`/`withContext` imports. `AddCategoryInput` now calls the existing `suspend addCustomCategory` from `rememberCoroutineScope()` inside try/catch; `CancellationException` is rethrown so a cancelled composable is not logged as a failure.
+- Filter state consolidation (part of P2-2/P2-3 and the section 4 "LaunchedEffect syncs two redundant state variables" finding): DONE - `08eee5b`. `FilterState` now lives directly in `rememberSaveable(stateSaver = FilterStateSaver)`; the mirrored `filterOption: String` / `filterCategory` saveables and the `LaunchedEffect` that rebuilt `filterState` from them are gone. Menu and chip callbacks write `FilterState(...)` directly. New `FilterStateSaverTest` (4 cases) covers round trip for every option and the Bundle-friendly saved form.
+- New bug found and fixed: filter-by-category menu offered the `"Add Custom..."` sentinel as a category - `fe084b6`. Selecting it produced `FilterState(CATEGORY, "Add Custom...")`, an empty list and a nonsense chip. `MainScreen.allCategories` is now default + custom only; the sentinel stays in `CategorySelector` where it is an action row.
+- P2-9 (duplicate `datastore` + unused Material 2 dependency): DONE - `dbe6ce2`. Removed `androidx.compose.material:material` (no `androidx.compose.material.*` imports outside `material.icons`) and `androidx.datastore:datastore` (api dependency of `datastore-preferences`) from `app/build.gradle.kts` and the catalog, plus the orphaned `datastore` version key.
+- P2-5 (accessibility), partial: `e146a4a`. `EventCard.clickable` now passes `role = Role.Button` and `onClickLabel = "Edit event"`. The remaining P2-5 sites are decorative-icon descriptions (see new findings).
+
+### Verify
+- Baseline (before changes): `./gradlew assembleDebug testDebugUnitTest` -> `BUILD SUCCESSFUL in 7m 3s`, **33/33** green. Only warning: pre-existing `'var statusBarColor: Int' is deprecated` at `Theme.kt:208`.
+- Final: `./gradlew assembleDebug testDebugUnitTest` -> `BUILD SUCCESSFUL in 2m 15s`, **37/37** green (`CalculateDaysLeftTest` 7, `IsColorBrightTest` 5, `CategoryColorsTest` 5, `FilterItemsTest` 7, `FilterStateSaverTest` 4 new, `EventViewModelTest` 9). Same single deprecation warning.
+- `assembleRelease` not re-run this wave (no keep-rule change; dependency removals only drop unused code). Device untouched (shared with other agents).
+- JDK note for this machine: the wrapper needs `JAVA_HOME=/Users/guy/.gradle/jdks/eclipse_adoptium-17-aarch64-os_x.2/jdk-17.0.19+10/Contents/Home` (the directory one level up is not a JDK home).
+
+### New findings (not fixed)
+| # | Issue | File(s) | Effort | Notes |
+|---|-------|---------|--------|-------|
+| F-6 | `import kotlin.jvm.java` is a dead import | `di/AppModule.kt:10` | S | Pre-existing; harmless. Remove with the next touch of that file |
+| F-7 | `'var statusBarColor: Int' is deprecated` (edge-to-edge APIs on SDK 35) | `ui/theme/Theme.kt:208` | S | Only compiler warning in the build; replace with `enableEdgeToEdge()` in `MainActivity` and drop the manual status bar color |
+| F-8 | Decorative icons carry noisy descriptions (`"Category Icon"` on `EventCard`) while several `SettingsScreen` icons pass `null`; audit which are decorative vs. the only label of a control | `EventCard.kt`, `SettingsScreen.kt` (lines 148, 242, 322, 346, 387, 411, 476) | S | Rest of P2-5 |
+| F-9 | Splash-during-rotation restarts the 1.5s timer (the `LaunchedEffect(true)` re-runs in the new composition). Cosmetic; the proper fix is the `androidx.core.splashscreen` API, which is a product decision | `navigation/AppNavigation.kt` | M | Only if the user wants the platform splash |
+
+### Carried-over items still open
+- P2-2 (extract `FilterMenu`/`SortMenu` from `MainScreen`, still ~650 lines) and P2-3 remainder (move `SortOption`/`FilterOption`/`FilterState`/`FilterStateSaver`/`filterItems`/`defaultCategories` to a `domain/` or `model/` package; `FilterItemsTest` and `FilterStateSaverTest` imports move with them).
+- P2-12 (pass navigation lambdas instead of `NavController` into `MainScreen`, `SettingsScreen`, `CategorySelector`, `AddEventBottomSheet`, `EditEventScreen`).
+- P2-1 (`java.util.Date` -> `java.time.LocalDate`), large.
+- F-4 toolchain bump (folds in P2-11 Koin 4.x), needs a full `assembleRelease` verify.
+- P0-2 remainder (`fallbackToDestructiveMigration`) still correctly deferred until a v5 schema change.
+- R8 release APK smoke on a device (carried since wave 4; needs release signing).
+
+### Next Session Resume (post Wave 12) - canonical
+
+- **Baseline:** assembleDebug + **37/37** unit tests green. Waves 1-12 committed; tree clean.
+- **Do next (pick one):**
+  1. **P2-2 + P2-3 remainder**: extract `FilterMenu`/`SortMenu` composables and move the filter/sort model types into a non-UI package. Pure refactor; existing `FilterItemsTest`/`FilterStateSaverTest` are the regression net.
+  2. **F-7 + F-8**: replace deprecated `statusBarColor` with `enableEdgeToEdge()`, then finish the P2-5 icon-description audit. Small.
+  3. **P2-12**: navigation lambdas instead of `NavController` parameters (pairs with the type-safe routes from P2-7).
+  4. **F-4** toolchain bump only with time for a full `assembleRelease` + device smoke.
+- **Resume prompt:** Read Wave 12. Start with option 1 or 2 for a bounded chunk; F-4 needs the full verify pipeline.
