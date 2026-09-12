@@ -652,7 +652,7 @@ Review-only session: no code changes. Re-read the full source tree against the o
 - P2-8 splash single source of truth (double-`delay` + illusory `startDestination` mutation).
 - Optional: R8 release APK smoke on device (carried; needs release signing if not already configured).
 
-### Next Session Resume (post Wave 11) — superseded by Wave 12 below
+### Next Session Resume (post Wave 11) - superseded by Wave 12 below
 
 - **Baseline:** assembleDebug + **33/33** unit tests. F-5 polish + debug emulator smoke done.
 - **Do next (pick one):**
