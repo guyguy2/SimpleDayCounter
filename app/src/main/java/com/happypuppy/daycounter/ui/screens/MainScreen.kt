@@ -56,6 +56,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -103,6 +105,19 @@ data class FilterState(
     val category: String? = null // Used when option is CATEGORY
 )
 
+/** Lets [FilterState] live directly in `rememberSaveable` (enum stored by name). */
+val FilterStateSaver: Saver<FilterState, Any> = mapSaver(
+    save = { mapOf(FILTER_OPTION_KEY to it.option.name, FILTER_CATEGORY_KEY to it.category) },
+    restore = {
+        FilterState(
+            option = FilterOption.valueOf(it[FILTER_OPTION_KEY] as String),
+            category = it[FILTER_CATEGORY_KEY] as String?
+        )
+    }
+)
+private const val FILTER_OPTION_KEY = "option"
+private const val FILTER_CATEGORY_KEY = "category"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koinViewModel()) {
@@ -124,17 +139,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     }
     var showFilterMenu by rememberSaveable { mutableStateOf(false) }
 
-    var filterOption by rememberSaveable { mutableStateOf(FilterOption.ALL.name) }
-    var filterCategory by rememberSaveable { mutableStateOf<String?>(null) }
-
-    var filterState by remember {
-        mutableStateOf(
-            FilterState(
-                option = FilterOption.valueOf(filterOption),
-                category = filterCategory
-            )
-        )
-    }
+    var filterState by rememberSaveable(stateSaver = FilterStateSaver) { mutableStateOf(FilterState()) }
     var showCategoryFilterOptions by rememberSaveable { mutableStateOf(false) }
 
     // Log orientation changes
@@ -167,13 +172,6 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
     val allCategories = remember(customCategories) {
         defaultCategories + customCategories.toList() + "Add Custom..."
-    }
-
-    LaunchedEffect(filterOption, filterCategory) {
-        filterState = FilterState(
-            option = FilterOption.valueOf(filterOption),
-            category = filterCategory
-        )
     }
 
     // Show undo snackbar when an item is deleted
@@ -226,8 +224,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             DropdownMenuItem(
                                 text = { Text("All Events") },
                                 onClick = {
-                                    filterOption = FilterOption.ALL.name
-                                    filterCategory = null
+                                    filterState = FilterState(option = FilterOption.ALL)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.ALL) {
@@ -238,8 +235,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             DropdownMenuItem(
                                 text = { Text("Future Events") },
                                 onClick = {
-                                    filterOption = FilterOption.FUTURE.name
-                                    filterCategory = null
+                                    filterState = FilterState(option = FilterOption.FUTURE)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.FUTURE) {
@@ -250,8 +246,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             DropdownMenuItem(
                                 text = { Text("Today's Events") },
                                 onClick = {
-                                    filterOption = FilterOption.TODAY.name
-                                    filterCategory = null
+                                    filterState = FilterState(option = FilterOption.TODAY)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.TODAY) {
@@ -263,8 +258,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             DropdownMenuItem(
                                 text = { Text("Past Events") },
                                 onClick = {
-                                    filterOption = FilterOption.PAST.name
-                                    filterCategory = null
+                                    filterState = FilterState(option = FilterOption.PAST)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.PAST) {
@@ -300,8 +294,10 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                 DropdownMenuItem(
                                     text = { Text(category) },
                                     onClick = {
-                                        filterOption = FilterOption.CATEGORY.name
-                                        filterCategory = category
+                                        filterState = FilterState(
+                                            option = FilterOption.CATEGORY,
+                                            category = category
+                                        )
                                         showCategoryFilterOptions = false
                                         showFilterMenu = false
                                     },
@@ -456,10 +452,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
                         filterState = filterState,
-                        onClear = {
-                            filterOption = FilterOption.ALL.name
-                            filterCategory = null
-                        }
+                        onClear = { filterState = FilterState() }
                     )
                 }
 
