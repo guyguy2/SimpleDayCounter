@@ -15,11 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * A reusable component for adding new custom categories.
@@ -38,6 +41,9 @@ fun AddCategoryInput(
 ) {
     var categoryText by remember { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }
+    // Lifecycle-bound scope: cancelled when this composable leaves composition,
+    // unlike the former unmanaged CoroutineScope(Dispatchers.IO) (IMPROVEMENTS.md P1-4).
+    val scope = rememberCoroutineScope()
 
     OutlinedTextField(
         value = categoryText,
@@ -73,13 +79,15 @@ fun AddCategoryInput(
 
                             isAdding = true
 
-                            // Use the async function with callback
-                            dataStoreManager.addCategoryAsync(formattedCategory) { success ->
-                                if (success) {
+                            scope.launch {
+                                try {
+                                    dataStoreManager.addCustomCategory(formattedCategory)
                                     if (BuildConfig.DEBUG) Log.d("CategoryAdd", "Successfully added: $formattedCategory")
                                     onCategoryAdded(formattedCategory)
-                                } else {
-                                    Log.e("CategoryAdd", "Failed to add category")
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    Log.e("CategoryAdd", "Failed to add category: ${e.message}")
                                     // Could add error handling UI here
                                 }
                                 isAdding = false
