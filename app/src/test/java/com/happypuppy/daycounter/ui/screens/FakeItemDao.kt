@@ -5,37 +5,51 @@ import com.happypuppy.daycounter.data.database.ItemDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 
 /**
- * In-memory test double for [ItemDao].
- *
- * Stores items in insertion order so that `getAllItems()` emits them deterministically
- * (production DAO orders by `created_at DESC`, but the ViewModel tests do not depend on
- * a particular ordering — only on the membership of the list after each mutation).
- *
- * `insertItem` mirrors Room's `OnConflictStrategy.REPLACE` behavior: an existing entry
- * with the same `id` is replaced in place; otherwise the item is appended. `deleteItem`
- * matches by `id`. `getAllItems` returns a hot [Flow] that re-emits on every mutation,
- * mirroring Room's reactive query behavior so the ViewModel under test sees fresh lists
- * without explicit re-queries.
+ * In-memory test double for [ItemDao] with optional error injection for testing error propagation.
  */
-class FakeItemDao : ItemDao {
+class FakeItemDao(
+    private val flowError: Throwable? = null
+) : ItemDao {
     private val itemsFlow = MutableStateFlow<List<Item>>(emptyList())
+    private var nextAutoId = 1
 
-    override fun getAllItems(): Flow<List<Item>> = itemsFlow.asStateFlow()
+    var insertError: Throwable? = null
+    var deleteError: Throwable? = null
+
+    val currentItems: List<Item> get() = itemsFlow.value
+
+    override fun getAllItems(): Flow<List<Item>> =
+        if (flowError != null) {
+            flow { throw flowError }
+        } else {
+            itemsFlow.asStateFlow()
+        }
 
     override suspend fun insertItem(item: Item) {
+        insertError?.let { throw it }
         val current = itemsFlow.value.toMutableList()
-        val existingIndex = current.indexOfFirst { it.id == item.id && item.id != 0 }
-        if (existingIndex >= 0) {
-            current[existingIndex] = item
+        val storedItem = if (item.id == 0) {
+            while (current.any { it.id == nextAutoId }) {
+                nextAutoId++
+            }
+            item.copy(id = nextAutoId++)
         } else {
-            current.add(item)
+            item
+        }
+        val existingIndex = current.indexOfFirst { it.id == storedItem.id }
+        if (existingIndex >= 0) {
+            current[existingIndex] = storedItem
+        } else {
+            current.add(storedItem)
         }
         itemsFlow.value = current
     }
 
     override suspend fun deleteItem(item: Item) {
+        deleteError?.let { throw it }
         itemsFlow.value = itemsFlow.value.filterNot { it.id == item.id }
     }
 }

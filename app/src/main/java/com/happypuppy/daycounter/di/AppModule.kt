@@ -18,7 +18,9 @@ val appModule = module {
             AppDatabase::class.java,
             "app_database"
         )
-            .fallbackToDestructiveMigration() // For simplicity in development
+            // Allow destructive upgrade only from legacy pre-v4 dev schemas;
+            // future schema bumps (v4 -> v5+) must provide explicit Room Migrations.
+            .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3)
             .build()
     }
 
