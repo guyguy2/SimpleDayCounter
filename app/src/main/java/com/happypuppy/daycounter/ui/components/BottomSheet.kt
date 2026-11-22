@@ -27,6 +27,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,7 +39,6 @@ import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
-import com.happypuppy.daycounter.ui.screens.rememberSaveableSheetState
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -55,15 +55,13 @@ fun AddEventBottomSheet(
     val dateFormat = LocalDateFormat.current
 
     // Use rememberSaveable to preserve state across configuration changes
-    var eventName by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
-    var eventEmoji by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    var eventName by rememberSaveable { mutableStateOf("") }
+    var eventEmoji by rememberSaveable { mutableStateOf("") }
     val calendar = Calendar.getInstance()
     val initialTargetDate = calendar.time
-    var targetDate by rememberSaveable { androidx.compose.runtime.mutableStateOf(initialTargetDate) }
-    var selectedCategory by rememberSaveable { androidx.compose.runtime.mutableStateOf("Personal") }
-
-    // Use BottomSheetStateSaver for the date picker state
-    val (showDatePicker, setShowDatePicker) = rememberSaveableSheetState("addEventDatePicker", false)
+    var targetDate by rememberSaveable { mutableStateOf(initialTargetDate) }
+    var selectedCategory by rememberSaveable { mutableStateOf("Personal") }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     // Debug statement to confirm when date picker state changes
     LaunchedEffect(showDatePicker) {
@@ -144,7 +142,7 @@ fun AddEventBottomSheet(
                     .clickable(
                         onClick = {
                             if (BuildConfig.DEBUG) Log.d("DatePicker", "Date field clicked, opening picker")
-                            setShowDatePicker(true)
+                            showDatePicker = true
                         }
                     )
             )
@@ -179,7 +177,6 @@ fun AddEventBottomSheet(
                     if (eventName.isNotBlank()) {
                         if (BuildConfig.DEBUG) Log.d("AddEvent", "Saving event: $eventName, date: $targetDate, category: $selectedCategory, emoji: $eventEmoji")
                         onSave(eventName, targetDate, selectedCategory, eventEmoji)
-                        onDismiss()
                     }
                 },
                 enabled = eventName.isNotBlank()
@@ -195,7 +192,7 @@ fun AddEventBottomSheet(
         DatePickerDialog(
             onDismissRequest = {
                 if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker dismissed")
-                setShowDatePicker(false)
+                showDatePicker = false
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -227,7 +224,7 @@ fun AddEventBottomSheet(
                         targetDate = localCalendar.time
                         if (BuildConfig.DEBUG) Log.d("DatePicker", "New date set: $targetDate")
                     }
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Confirm")
                 }
@@ -235,7 +232,7 @@ fun AddEventBottomSheet(
             dismissButton = {
                 TextButton(onClick = {
                     if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker cancelled")
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Cancel")
                 }

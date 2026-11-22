@@ -8,7 +8,6 @@ import com.happypuppy.daycounter.ui.screens.EventViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.dsl.module
-import kotlin.jvm.java
 
 // Create a Koin module
 val appModule = module {
