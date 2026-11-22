@@ -48,7 +48,7 @@
 -keep class com.happypuppy.daycounter.data.repository.DateConverters { *; }
 
 # ---------------------------------------------------------------------------
-# Koin 3.x
+# Koin 4.x
 # Koin resolves dependencies via Kotlin reflection on constructor references
 # (e.g. `viewModelOf(::EventViewModel)` and `single { ... }`). Keep our DI
 # module + ViewModels + classes that participate in DI so their constructors
