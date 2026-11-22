@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing keys, service accounts, and local tool history
+*.jks
+*.p12
+*.keystore
+keystore.properties
+play-key.json
+*-service-account*.json
+.secure_files/
+.aider*
