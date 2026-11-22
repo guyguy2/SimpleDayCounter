@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
@@ -33,7 +31,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +52,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -127,9 +123,8 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var selectedSortOption by rememberSaveable { mutableStateOf(SortOption.DATE_ADDED_DESC) }
 
-    // Use the BottomSheetStateSaver for managing bottom sheet states
-    val (showAddEventSheet, setShowAddEventSheet) = rememberSaveableSheetState("addEventSheet", false)
-    val (showEditEventSheet, setShowEditEventSheet) = rememberSaveableSheetState("editEventSheet", false)
+    var showAddEventSheet by rememberSaveable { mutableStateOf(false) }
+    var showEditEventSheet by rememberSaveable { mutableStateOf(false) }
 
     // Save only the selected item's id; resolve the Item against the current list so the
     // edit sheet survives configuration changes and process death (IMPROVEMENTS.md F-1).
@@ -426,7 +421,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { setShowAddEventSheet(true) },
+                onClick = { showAddEventSheet = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 icon = {
@@ -505,7 +500,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                 onDelete = { viewModel.deleteItem(item) },
                                 onClick = {
                                     selectedItemId = item.id
-                                    setShowEditEventSheet(true)
+                                    showEditEventSheet = true
                                 }
                             )
                         }
@@ -520,12 +515,12 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             // Add event sheet
             if (showAddEventSheet) {
                 ModalBottomSheet(
-                    onDismissRequest = { setShowAddEventSheet(false) },
+                    onDismissRequest = { showAddEventSheet = false },
                     sheetState = bottomSheetState
                 ) {
                     AddEventBottomSheet(
                         dataStoreManager = dataStoreManager,
-                        onDismiss = { setShowAddEventSheet(false) },
+                        onDismiss = { showAddEventSheet = false },
                         onSave = { name, date, category, emoji ->
                             viewModel.saveItem(
                                 name = name,
@@ -533,7 +528,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                 targetDate = date,
                                 emoji = emoji
                             )
-                            setShowAddEventSheet(false)
+                            showAddEventSheet = false
                         },
                         navController = navController
                     )
@@ -543,7 +538,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             // Edit event sheet
             if (showEditEventSheet && selectedItem != null) {
                 ModalBottomSheet(
-                    onDismissRequest = { setShowEditEventSheet(false) },
+                    onDismissRequest = { showEditEventSheet = false },
                     sheetState = bottomSheetState
                 ) {
                     EditEventScreen(
@@ -551,12 +546,11 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         dataStoreManager = dataStoreManager,
                         onSave = { item ->
                             viewModel.updateItem(item)
-                            setShowEditEventSheet(false)
+                            showEditEventSheet = false
                         },
-                        onCancel = { setShowEditEventSheet(false) },
                         onDelete = { item ->
                             viewModel.deleteItem(item)
-                            setShowEditEventSheet(false)
+                            showEditEventSheet = false
                         },
                         navController = navController
                     )

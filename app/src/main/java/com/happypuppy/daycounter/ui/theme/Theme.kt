@@ -49,10 +49,6 @@ val LocalDateFormat = staticCompositionLocalOf<DateFormat> {
 }
 
 // Light Theme Colors
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
 val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
@@ -75,11 +71,6 @@ val DarkError = Color(0xFFCF6679)
 val DarkCardPink = Color(0xFF331A24)     // Darker pink for past events cards (was 0xFF2D1A24)
 val DarkCardYellow = Color(0xFF332912)   // Darker yellow for future events cards (was 0xFF2D2512)
 val DarkCardPurple = Color(0xFF2B1A33)   // Darker purple for today cards (was 0xFF221A2D)
-
-// Dark Card Accent Colors (brighter for better contrast when used for text)
-val DarkAccentPink = Color(0xFFEC407A)   // Brighter pink for past events (was 0xFFE91E63)
-val DarkAccentYellow = Color(0xFFFFA726) // Brighter orange for future events (was 0xFFFF9800)
-val DarkAccentPurple = Color(0xFFAB47BC) // Brighter purple for today (was 0xFF9C27B0)
 
 // Dark Text Colors with improved contrast
 val DarkOnSurface = Color(0xFFEEEEEE)      // Whiter primary text for better contrast (was 0xFFE0E0E0)
@@ -139,27 +130,6 @@ val AppTypography = Typography(
     )
 )
 
-// Modify the getCounterColor function to respect dark theme
-fun getCounterColor(daysLeft: Int, isDarkTheme: Boolean): Color {
-    return if (isDarkTheme) {
-        when {
-            daysLeft > 30 -> Color(0xFF4CAF50) // Keep green
-            daysLeft > 7 -> Color(0xFF2196F3)  // Keep blue
-            daysLeft > 0 -> DarkAccentYellow   // Brighter orange for dark theme
-            daysLeft == 0 -> DarkAccentPurple  // Brighter purple for dark theme
-            else -> DarkAccentPink             // Brighter pink for dark theme
-        }
-    } else {
-        when {
-            daysLeft > 30 -> Color(0xFF4CAF50) // Green
-            daysLeft > 7 -> Color(0xFF2196F3)  // Blue
-            daysLeft > 0 -> Color(0xFFFF9800)  // Orange
-            daysLeft == 0 -> Color(0xFF9C27B0) // Purple
-            else -> Color(0xFFE91E63)          // Pink (past date)
-        }
-    }
-}
-
 @Composable
 fun SimpleDayCounterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -183,12 +153,10 @@ fun SimpleDayCounterTheme(
         AppTheme.SYSTEM_DEFAULT -> darkTheme
         AppTheme.LIGHT -> false
         AppTheme.DARK -> true
-        // Add an else branch to handle potential future theme values
-        else -> darkTheme
     }
 
     val colorScheme = when {
-        dynamicColor && true -> {
+        dynamicColor -> {
             val context = LocalContext.current
             if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }

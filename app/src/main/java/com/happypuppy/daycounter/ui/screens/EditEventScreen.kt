@@ -51,7 +51,6 @@ fun EditEventScreen(
     item: Item,
     dataStoreManager: DataStoreManager,
     onSave: (Item) -> Unit,
-    onCancel: () -> Unit,
     onDelete: (Item) -> Unit,
     navController: NavController? = null
 ) {
@@ -62,12 +61,7 @@ fun EditEventScreen(
     var emoji by rememberSaveable(item.id) { mutableStateOf(item.emoji) }
     var targetDate by rememberSaveable(item.id) { mutableStateOf(item.targetDate) }
     var selectedCategory by rememberSaveable(item.id) { mutableStateOf(item.itemCategory) }
-
-    // Use rememberSaveableSheetState for the date picker dialog
-    val (showDatePicker, setShowDatePicker) = rememberSaveableSheetState(
-        "editDatePicker_${item.id}",
-        false
-    )
+    var showDatePicker by rememberSaveable(item.id) { mutableStateOf(false) }
 
     // Log state for debugging
     LaunchedEffect(showDatePicker) {
@@ -151,7 +145,7 @@ fun EditEventScreen(
                     .clickable(
                         onClick = {
                             if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen date field clicked, opening picker")
-                            setShowDatePicker(true)
+                            showDatePicker = true
                         }
                     )
             )
@@ -205,7 +199,7 @@ fun EditEventScreen(
     // Date picker dialog
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { setShowDatePicker(false) },
+            onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
@@ -235,13 +229,13 @@ fun EditEventScreen(
                         targetDate = localCalendar.time
                         if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen: New date set: $targetDate")
                     }
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Confirm")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { setShowDatePicker(false) }) {
+                TextButton(onClick = { showDatePicker = false }) {
                     Text("Cancel")
                 }
             }

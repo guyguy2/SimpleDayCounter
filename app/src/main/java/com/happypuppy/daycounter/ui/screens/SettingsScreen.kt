@@ -1,7 +1,6 @@
 package com.happypuppy.daycounter.ui.screens
 
 import android.content.Intent
-import android.media.RingtoneManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Today
@@ -105,9 +103,6 @@ fun SettingsScreen(navController: NavHostController) {
 
             // Vibration setting
             VibrationSetting(dataStoreManager)
-
-            // Sound setting
-//            SoundSetting(dataStoreManager)
 
             HorizontalDivider()
 
@@ -266,37 +261,6 @@ fun VibrationSetting(dataStoreManager: DataStoreManager) {
 
                 if (enabled) {
                     vibrate(context)
-                }
-            }
-        }
-    )
-}
-
-@Composable
-fun SoundSetting(dataStoreManager: DataStoreManager) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val isEnabled by dataStoreManager.soundEnabledFlow.collectAsState(initial = false)
-
-    SettingSwitch(
-        title = "Sound",
-        description = "Play sound when display changes color",
-        checked = isEnabled,
-        icon = Icons.Outlined.Notifications,
-        onCheckedChange = { enabled ->
-            scope.launch {
-                dataStoreManager.setSoundEnabled(enabled)
-
-                // Demonstration sound when enabled
-                if (enabled) {
-                    try {
-                        val notification =
-                            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                        val ringtone = RingtoneManager.getRingtone(context, notification)
-                        ringtone.play()
-                    } catch (e: Exception) {
-                        // Handle potential exceptions
-                    }
                 }
             }
         }

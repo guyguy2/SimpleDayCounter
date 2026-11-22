@@ -20,7 +20,6 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 // Preference keys
 val THEME_KEY = stringPreferencesKey("app_theme")
 val VIBRATE_KEY = booleanPreferencesKey("vibrate_enabled")
-val SOUND_KEY = booleanPreferencesKey("sound_enabled")
 val DATE_FORMAT_KEY = stringPreferencesKey("date_format")
 val CUSTOM_CATEGORIES_KEY = stringSetPreferencesKey("custom_categories")
 
@@ -75,18 +74,6 @@ class DataStoreManager(private val context: Context) {
     suspend fun setVibrateEnabled(enabled: Boolean) {
         context.dataStore.edit { settings ->
             settings[VIBRATE_KEY] = enabled
-        }
-    }
-
-    // Sound preference (default: false)
-    val soundEnabledFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[SOUND_KEY] ?: false
-        }
-
-    suspend fun setSoundEnabled(enabled: Boolean) {
-        context.dataStore.edit { settings ->
-            settings[SOUND_KEY] = enabled
         }
     }
 

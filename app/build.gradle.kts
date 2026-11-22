@@ -1,6 +1,4 @@
 import com.github.triplet.gradle.androidpublisher.ReleaseStatus
-import org.gradle.kotlin.dsl.implementation
-import org.gradle.kotlin.dsl.room
 import java.util.Properties
 
 plugins {
@@ -149,8 +147,7 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     ksp(libs.room.compiler)
-//    implementation(libs.koin.compose.viewmodel)
-    implementation (libs.androidx.material.icons.extended)
+    implementation(libs.androidx.material.icons.extended)
 
 
 
