@@ -40,7 +40,7 @@ fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
         shape = RoundedCornerShape(8.dp)
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -55,11 +55,12 @@ fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onClear) {
                 Icon(
                     imageVector = Icons.Default.Clear,
                     contentDescription = "Clear Filter",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

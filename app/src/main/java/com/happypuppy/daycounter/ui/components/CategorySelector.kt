@@ -45,9 +45,9 @@ fun CategorySelector(
     // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
     val isDarkTheme = LocalIsDarkTheme.current
 
-    // Combine default and custom categories for the dropdown
+    // Combine default and alphabetically sorted custom categories for the dropdown
     val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.toList() + "Add Custom..."
+        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER) + "Add Custom..."
     }
 
     Column(modifier = modifier) {

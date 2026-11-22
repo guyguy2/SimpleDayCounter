@@ -9,14 +9,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,15 +41,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,9 +66,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,7 +85,6 @@ import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.vibrate
-import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -119,7 +128,14 @@ private const val FILTER_CATEGORY_KEY = "category"
 fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koinViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val addSheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
+    val editSheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var selectedSortOption by rememberSaveable { mutableStateOf(SortOption.DATE_ADDED_DESC) }
 
@@ -143,21 +159,19 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
         if (BuildConfig.DEBUG) Log.d("MainScreen", "Configuration changed: orientation=${configuration.orientation}")
     }
 
-    // Sort items based on selected option
+    // Sort items based on selected option (case-insensitive for name/category)
     val filteredAndSortedItems = remember(uiState.items, selectedSortOption, filterState) {
-        // First filter the items
         val filteredItems = filterItems(uiState.items, filterState)
 
-        // Then sort the filtered items
         when (selectedSortOption) {
-            SortOption.NAME_ASC -> filteredItems.sortedBy { it.name }
-            SortOption.NAME_DESC -> filteredItems.sortedByDescending { it.name }
+            SortOption.NAME_ASC -> filteredItems.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            SortOption.NAME_DESC -> filteredItems.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.name })
             SortOption.TARGET_DATE_ASC -> filteredItems.sortedBy { it.targetDate }
             SortOption.TARGET_DATE_DESC -> filteredItems.sortedByDescending { it.targetDate }
             SortOption.DATE_ADDED_ASC -> filteredItems.sortedBy { it.createdAt }
             SortOption.DATE_ADDED_DESC -> filteredItems.sortedByDescending { it.createdAt }
-            SortOption.CATEGORY_ASC -> filteredItems.sortedBy { it.itemCategory }
-            SortOption.CATEGORY_DESC -> filteredItems.sortedByDescending { it.itemCategory }
+            SortOption.CATEGORY_ASC -> filteredItems.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
+            SortOption.CATEGORY_DESC -> filteredItems.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
         }
     }
 
@@ -167,16 +181,16 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
     // Filter menu lists real categories only; the "Add Custom..." entry belongs to CategorySelector.
     val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.toList()
+        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER)
     }
 
-    // Show undo snackbar when an item is deleted
-    LaunchedEffect(uiState.showUndoSnackbar) {
-        if (uiState.showUndoSnackbar && uiState.lastDeletedItem != null) {
-            // Short delay to ensure the swipe animation has completed
-            delay(200)
+    // Show undo snackbar whenever a new delete event occurs (keyed on monotonic token so
+    // consecutive deletes replace the previous snackbar cleanly).
+    LaunchedEffect(uiState.snackbarToken) {
+        val deletedItem = uiState.lastDeletedItem
+        if (uiState.showUndoSnackbar && deletedItem != null) {
             val result = snackbarHostState.showSnackbar(
-                message = "\"${uiState.lastDeletedItem?.name}\" deleted",
+                message = "\"${deletedItem.name}\" deleted",
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short
             )
@@ -249,7 +263,6 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                     { Icon(Icons.Default.Check, contentDescription = "Selected") }
                                 } else null
                             )
-
 
                             DropdownMenuItem(
                                 text = { Text("Past Events") },
@@ -436,14 +449,48 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             )
         }
     ) { innerPadding ->
+        val layoutDirection = LocalLayoutDirection.current
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(
+                    top = innerPadding.calculateTopPadding(),
+                    start = innerPadding.calculateStartPadding(layoutDirection),
+                    end = innerPadding.calculateEndPadding(layoutDirection)
+                )
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Error banner if any database operation failed
+                uiState.error?.let { errorMessage ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { viewModel.clearError() }) {
+                                Text(
+                                    text = "Dismiss",
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Show filter chip if filter is active
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
@@ -452,61 +499,81 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     )
                 }
 
-                // Show appropriate content based on filtered/sorted items
-                if (filteredAndSortedItems.isEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = if (filterState.option != FilterOption.ALL)
-                                "No Events Match Filter" else "No Events Yet",
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (filterState.option != FilterOption.ALL)
-                                "Try changing your filter settings"
-                            else "Tap the + button to add your first event",
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                // Show loading, empty state, or event list
+                when {
+                    uiState.isLoading && uiState.items.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = innerPadding.calculateBottomPadding()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = filteredAndSortedItems,
-                            // Include restoration timestamp so undo remounts the row
-                            // (resets swipe state). Inner key {} is unnecessary.
-                            key = { item ->
-                                val restorationKey = uiState.restoredItemKeys[item.id] ?: 0L
-                                "${item.id}_$restorationKey"
-                            }
-                        ) { item ->
-                            SwipeToDeleteItem(
-                                item = item,
-                                wasUndone = uiState.restoredItemKeys.containsKey(item.id),
-                                isVibrationEnabled = isVibrationEnabled,
-                                onDelete = { viewModel.deleteItem(item) },
-                                onClick = {
-                                    selectedItemId = item.id
-                                    showEditEventSheet = true
-                                }
+
+                    filteredAndSortedItems.isEmpty() -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 16.dp,
+                                    bottom = innerPadding.calculateBottomPadding() + 16.dp
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (filterState.option != FilterOption.ALL)
+                                    "No Events Match Filter" else "No Events Yet",
+                                style = MaterialTheme.typography.headlineMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (filterState.option != FilterOption.ALL)
+                                    "Try changing your filter settings"
+                                else "Tap the + button to add your first event",
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
 
-                        item {
-                            Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = innerPadding.calculateBottomPadding() + 88.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(
+                                items = filteredAndSortedItems,
+                                // Include restoration token so undo remounts the row
+                                // (resets swipe state).
+                                key = { item ->
+                                    val restorationKey = uiState.restoredItemKeys[item.id] ?: 0L
+                                    "${item.id}_$restorationKey"
+                                }
+                            ) { item ->
+                                SwipeToDeleteItem(
+                                    item = item,
+                                    wasUndone = uiState.restoredItemKeys.containsKey(item.id),
+                                    isVibrationEnabled = isVibrationEnabled,
+                                    onDelete = { viewModel.deleteItem(item) },
+                                    onClick = {
+                                        selectedItemId = item.id
+                                        showEditEventSheet = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -516,7 +583,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             if (showAddEventSheet) {
                 ModalBottomSheet(
                     onDismissRequest = { showAddEventSheet = false },
-                    sheetState = bottomSheetState
+                    sheetState = addSheetState
                 ) {
                     AddEventBottomSheet(
                         dataStoreManager = dataStoreManager,
@@ -539,7 +606,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             if (showEditEventSheet && selectedItem != null) {
                 ModalBottomSheet(
                     onDismissRequest = { showEditEventSheet = false },
-                    sheetState = bottomSheetState
+                    sheetState = editSheetState
                 ) {
                     EditEventScreen(
                         item = selectedItem,
@@ -570,7 +637,6 @@ fun SwipeToDeleteItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-
     var isRemoved by remember { mutableStateOf(false) }
 
     // Reset isRemoved if this item was just restored via undo
@@ -582,28 +648,8 @@ fun SwipeToDeleteItem(
     }
 
     val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { it * 0.5f },
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
-                isRemoved = true
-                true
-            } else {
-                false
-            }
-        }
+        positionalThreshold = { it * 0.5f }
     )
-
-    LaunchedEffect(isRemoved) {
-        if (isRemoved) {
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Item ${item.id} marked as removed, animating...")
-            if (isVibrationEnabled) {
-                vibrate(context)
-            }
-            delay(200)
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
-            onDelete()
-        }
-    }
 
     AnimatedVisibility(
         visible = !isRemoved,
@@ -612,17 +658,31 @@ fun SwipeToDeleteItem(
     ) {
         SwipeToDismissBox(
             state = dismissState,
+            onDismiss = { value ->
+                if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
+                    if (!isRemoved) {
+                        isRemoved = true
+                        if (isVibrationEnabled) {
+                            vibrate(context)
+                        }
+                        if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
+                        onDelete()
+                    }
+                }
+            },
             backgroundContent = {
                 val color by animateColorAsState(
-                    when (dismissState.targetValue) {
-                        SwipeToDismissBoxValue.Settled -> Color.LightGray
-                        SwipeToDismissBoxValue.StartToEnd -> Color(0xFF4CAF50) // Green
-                        SwipeToDismissBoxValue.EndToStart -> Color(0xFFE91E63) // Pink/Red
-                    }
+                    targetValue = when (dismissState.targetValue) {
+                        SwipeToDismissBoxValue.Settled -> Color.Transparent
+                        SwipeToDismissBoxValue.StartToEnd,
+                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
+                    },
+                    label = "SwipeDeleteBackground"
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
                         .background(color),
                     contentAlignment = if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd)
                         Alignment.CenterStart else Alignment.CenterEnd
@@ -630,7 +690,7 @@ fun SwipeToDeleteItem(
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onError,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }

@@ -1,5 +1,6 @@
 package com.happypuppy.daycounter.ui.screens
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,11 +53,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -69,12 +75,11 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.util.Date
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavHostController) {
     val dataStoreManager = koinInject<DataStoreManager>()
-    var showAboutDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -96,12 +101,10 @@ fun SettingsScreen(navController: NavHostController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Theme setting
             ThemeSelector(dataStoreManager)
 
             HorizontalDivider()
 
-            // Vibration setting
             VibrationSetting(dataStoreManager)
 
             HorizontalDivider()
@@ -110,19 +113,15 @@ fun SettingsScreen(navController: NavHostController) {
 
             HorizontalDivider()
 
-            // Category Management
             CategoryManagementSetting(navController)
 
             HorizontalDivider()
 
-            // Rate app
             RateAppSetting()
 
-            // About
             AboutSetting(onClick = { showAboutDialog = true })
         }
 
-        // About dialog
         if (showAboutDialog) {
             AboutDialog(onDismiss = { showAboutDialog = false })
         }
@@ -160,15 +159,15 @@ fun CategoryManagementSetting(navController: NavHostController) {
     }
 }
 
-// Other existing functions in SettingsScreen.kt remain the same
-
 @Composable
 fun ThemeSelector(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
     val currentTheme by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectableGroup()
     ) {
         Text(
             text = "Theme",
@@ -177,7 +176,6 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // System Default option
         ThemeOption(
             title = "System Default",
             icon = Icons.Outlined.Smartphone,
@@ -189,7 +187,6 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
             }
         )
 
-        // Light Theme option
         ThemeOption(
             title = "Light",
             icon = Icons.Outlined.LightMode,
@@ -201,7 +198,6 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
             }
         )
 
-        // Dark Theme option
         ThemeOption(
             title = "Dark",
             icon = Icons.Outlined.DarkMode,
@@ -225,16 +221,21 @@ fun ThemeOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.RadioButton
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(
             selected = selected,
-            onClick = onClick
+            onClick = null
         )
         Icon(
-            icon, contentDescription = null,
+            imageVector = icon,
+            contentDescription = null,
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .size(24.dp)
@@ -278,6 +279,11 @@ fun SettingSwitch(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
+                role = Role.Switch
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -302,7 +308,7 @@ fun SettingSwitch(
         }
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             thumbContent = if (checked) {
                 {
                     Icon(
@@ -326,21 +332,22 @@ fun RateAppSetting() {
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                // Open Play Store
+                val marketIntent = Intent(Intent.ACTION_VIEW).apply {
+                    data = "market://details?id=${context.packageName}".toUri()
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        data = "market://details?id=${context.packageName}".toUri()
+                    context.startActivity(marketIntent)
+                } catch (_: ActivityNotFoundException) {
+                    val webIntent = Intent(Intent.ACTION_VIEW).apply {
+                        data = "https://play.google.com/store/apps/details?id=${context.packageName}".toUri()
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    // If Play Store app is not installed, open in browser
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        data =
-                            "https://play.google.com/store/apps/details?id=${context.packageName}".toUri()
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    try {
+                        context.startActivity(webIntent)
+                    } catch (_: ActivityNotFoundException) {
+                        // No Play Store or browser installed; ignore safely.
                     }
-                    context.startActivity(intent)
                 }
             }
             .padding(vertical = 12.dp),
@@ -410,7 +417,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("©2025 Simple Day Counter")
+                Text("©2026 Simple Day Counter")
                 Text("All rights reserved")
             }
         },
@@ -427,7 +434,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
     val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
     var showFormatOptions by remember { mutableStateOf(false) }
-    val sampleDate = remember { Date() } // Define the sample date at function level
+    val sampleDate = remember { Date() }
 
     Row(
         modifier = Modifier
@@ -436,7 +443,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.Today, // Using DateRange which is already imported
+            imageVector = Icons.Outlined.Today,
             contentDescription = null,
             modifier = Modifier
                 .padding(end = 16.dp)
@@ -453,10 +460,8 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Format preview
             val formattedDate = formatDate(sampleDate, currentFormat)
 
-            // DropdownMenu must be a child of this Box so it anchors under the field
             Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = currentFormat.displayName,
@@ -518,4 +523,3 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
         }
     }
 }
-

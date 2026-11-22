@@ -109,6 +109,12 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    suspend fun clearCustomCategories() {
+        context.dataStore.edit { settings ->
+            settings[CUSTOM_CATEGORIES_KEY] = emptySet()
+        }
+    }
+
 }
 
 /** Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). */

@@ -4,8 +4,11 @@ import android.content.res.Configuration
 import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,12 +38,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
@@ -58,6 +63,9 @@ import org.koin.compose.koinInject
 fun CategoryManagementScreen(navController: NavHostController) {
     val dataStoreManager = koinInject<DataStoreManager>()
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
+    val sortedCustomCategories = remember(customCategories) {
+        customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER)
+    }
     val scope = rememberCoroutineScope()
 
     // Use rememberSaveable to preserve state during configuration changes
@@ -65,14 +73,12 @@ fun CategoryManagementScreen(navController: NavHostController) {
     var showAddCategoryInput by rememberSaveable { mutableStateOf(false) }
     var showDeleteAllConfirmation by rememberSaveable { mutableStateOf(false) }
 
-    // Remember scroll positions for both lists
+    // Remember scroll positions
+    val portraitListState = rememberLazyListState()
     val defaultListState = rememberLazyListState()
     val customListState = rememberLazyListState()
 
-    // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
     val isDarkTheme = LocalIsDarkTheme.current
-
-    // Get the current orientation
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -90,6 +96,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
             )
         }
     ) { innerPadding ->
+        val layoutDirection = LocalLayoutDirection.current
         if (isLandscape) {
             // Landscape layout (two columns)
             Row(
@@ -111,19 +118,20 @@ fun CategoryManagementScreen(navController: NavHostController) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Default categories list
-                    LazyColumn(state = defaultListState) {
-                        items(defaultCategories) { category ->
+                    LazyColumn(
+                        state = defaultListState,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(defaultCategories, key = { it }) { category ->
                             CategoryItem(
                                 category = category,
                                 isDarkTheme = isDarkTheme,
-                                onDelete = null // No delete option for default categories
+                                onDelete = null
                             )
                         }
                     }
                 }
 
-                // Add a vertical divider between columns
                 VerticalDivider(
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
@@ -136,7 +144,6 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         .weight(1f)
                         .padding(start = 8.dp)
                 ) {
-                    // Custom categories header with Add and Delete All buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -147,18 +154,16 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Delete All button (in red)
-                        if (customCategories.isNotEmpty()) {
+                        if (sortedCustomCategories.isNotEmpty()) {
                             IconButton(onClick = { showDeleteAllConfirmation = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Delete All Categories",
-                                    tint = MaterialTheme.colorScheme.error // Red color
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
 
-                        // Add button
                         IconButton(onClick = { showAddCategoryInput = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -167,27 +172,22 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         }
                     }
 
-                    // Add category input field when shown
                     if (showAddCategoryInput) {
                         AddCategoryInput(
                             dataStoreManager = dataStoreManager,
-                            onCategoryAdded = { newCategory ->
-                                // Category was successfully added
-                                showAddCategoryInput = false
-                            },
-                            onCancel = {
-                                showAddCategoryInput = false
-                            },
+                            onCategoryAdded = { showAddCategoryInput = false },
+                            onCancel = { showAddCategoryInput = false },
                             placeholder = "Enter a new category name"
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Custom categories list or empty state message
-                    if (customCategories.isEmpty()) {
+                    if (sortedCustomCategories.isEmpty()) {
                         Box(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -197,8 +197,11 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             )
                         }
                     } else {
-                        LazyColumn(state = customListState) {
-                            items(customCategories.toList()) { category ->
+                        LazyColumn(
+                            state = customListState,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(sortedCustomCategories, key = { it }) { category ->
                                 CategoryItem(
                                     category = category,
                                     isDarkTheme = isDarkTheme,
@@ -210,99 +213,103 @@ fun CategoryManagementScreen(navController: NavHostController) {
                 }
             }
         } else {
-            // Portrait layout (original single column)
-            Column(
+            // Portrait layout: single LazyColumn so neither default nor custom categories get clipped.
+            LazyColumn(
+                state = portraitListState,
                 modifier = Modifier
-                    .padding(innerPadding)
-                    .padding(16.dp)
+                    .fillMaxSize()
+                    .padding(
+                        top = innerPadding.calculateTopPadding(),
+                        start = innerPadding.calculateStartPadding(layoutDirection),
+                        end = innerPadding.calculateEndPadding(layoutDirection)
+                    ),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 16.dp
+                )
             ) {
-                // Show the add category input if enabled
                 if (showAddCategoryInput) {
-                    AddCategoryInput(
-                        dataStoreManager = dataStoreManager,
-                        onCategoryAdded = { newCategory ->
-                            // Category was successfully added
-                            showAddCategoryInput = false
-                        },
-                        onCancel = {
-                            showAddCategoryInput = false
-                        },
-                        placeholder = "Enter a new category name"
-                    )
+                    item(key = "add_category_input") {
+                        AddCategoryInput(
+                            dataStoreManager = dataStoreManager,
+                            onCategoryAdded = { showAddCategoryInput = false },
+                            onCancel = { showAddCategoryInput = false },
+                            placeholder = "Enter a new category name"
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
 
+                item(key = "default_header") {
+                    Text(
+                        text = "Default Categories",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                items(defaultCategories, key = { "default_$it" }) { category ->
+                    CategoryItem(
+                        category = category,
+                        isDarkTheme = isDarkTheme,
+                        onDelete = null
+                    )
+                }
+
+                item(key = "section_divider") {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                Text(
-                    text = "Default Categories",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                item(key = "custom_header") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Custom Categories",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f)
+                        )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                        if (sortedCustomCategories.isNotEmpty()) {
+                            IconButton(onClick = { showDeleteAllConfirmation = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete All Categories",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
 
-                // Display default categories with colors
-                LazyColumn(state = defaultListState) {
-                    items(defaultCategories) { category ->
+                        IconButton(onClick = { showAddCategoryInput = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Custom Category"
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (sortedCustomCategories.isEmpty()) {
+                    item(key = "custom_empty") {
+                        Text(
+                            text = "No custom categories yet. Add one using the + button.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    items(sortedCustomCategories, key = { it }) { category ->
                         CategoryItem(
                             category = category,
                             isDarkTheme = isDarkTheme,
-                            onDelete = null
+                            onDelete = { categoryToDelete = category }
                         )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Custom categories section
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Custom Categories",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // Delete All button (in red)
-                    if (customCategories.isNotEmpty()) {
-                        IconButton(onClick = { showDeleteAllConfirmation = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete All Categories",
-                                tint = MaterialTheme.colorScheme.error // Red color
-                            )
-                        }
-                    }
-
-                    // Add button next to the section title
-                    IconButton(onClick = { showAddCategoryInput = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Custom Category"
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (customCategories.isEmpty()) {
-                    Text(
-                        text = "No custom categories yet. Add one using the + button.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    LazyColumn(state = customListState) {
-                        items(customCategories.toList()) { category ->
-                            CategoryItem(
-                                category = category,
-                                isDarkTheme = isDarkTheme,
-                                onDelete = { categoryToDelete = category }
-                            )
-                        }
                     }
                 }
             }
@@ -345,15 +352,12 @@ fun CategoryManagementScreen(navController: NavHostController) {
                 TextButton(
                     onClick = {
                         scope.launch {
-                            // Remove all custom categories
-                            customCategories.forEach { category ->
-                                dataStoreManager.removeCustomCategory(category)
-                            }
+                            dataStoreManager.clearCustomCategories()
                         }
                         showDeleteAllConfirmation = false
                     }
                 ) {
-                    Text("Delete All", color = MaterialTheme.colorScheme.error) // Red text for emphasis
+                    Text("Delete All", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -365,13 +369,6 @@ fun CategoryManagementScreen(navController: NavHostController) {
     }
 }
 
-/**
- * Reusable category item component
- *
- * @param category The category name
- * @param isDarkTheme Whether dark theme is active
- * @param onDelete Optional callback when delete is clicked (null for default categories)
- */
 @Composable
 private fun CategoryItem(
     category: String,
@@ -389,7 +386,6 @@ private fun CategoryItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Display color indicator
             CategoryColorIndicator(
                 color = CategoryColors.getCategoryColor(category, isDarkTheme)
             )
@@ -401,7 +397,6 @@ private fun CategoryItem(
                 modifier = Modifier.weight(1f)
             )
 
-            // Show delete button only for custom categories
             if (onDelete != null) {
                 IconButton(onClick = onDelete) {
                     Icon(
