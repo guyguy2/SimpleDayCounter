@@ -20,7 +20,11 @@ fun signingValue(env: String, prop: String): String? =
 
 android {
     namespace = "com.happypuppy.daycounter"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "com.happypuppy.daycounter"
@@ -77,14 +81,6 @@ android {
         // BuildConfig.DEBUG is referenced by Log.d guards across the app to
         // strip debug logging from release builds.
         buildConfig = true
-    }
-
-    lint {
-        // `Instantiatable` is a known false positive for `MainActivity` which
-        // correctly extends `androidx.activity.ComponentActivity` (a subclass
-        // of `Activity`). It would otherwise fail `lintVitalRelease` and block
-        // `assembleRelease` even though the class is valid at runtime.
-        disable += "Instantiatable"
     }
 
     testOptions {
