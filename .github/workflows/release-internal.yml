@@ -8,7 +8,6 @@ on:
       - "README.md"
       - "AGENTS.md"
       - "CLAUDE.md"
-      - "IMPROVEMENTS.md"
       - ".gitignore"
       - "LICENSE"
   workflow_dispatch:
