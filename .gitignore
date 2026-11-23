@@ -1,36 +1,87 @@
-*.iml
-.gradle
-/local.properties
-/.idea/
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-.kotlin/
-
-# Build outputs
+# Built application files
 *.apk
+*.aar
+*.ap_
 *.aab
 app/release/
 
-# Generated Play release notes
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
 app/src/main/play/release-notes/
 
-# Signing keys, service accounts, secrets, and local tool history
+# Gradle / Kotlin caches & build outputs
+.gradle/
+.kotlin/
+build/
+**/build/
+
+# Local configuration file (SDK path, etc.)
+local.properties
+
+# Log & profiling files
+*.log
+*.hprof
+
+# Android Studio / IntelliJ / VS Code
+*.iml
+/.idea/
+.navigation/
+captures/
+vcs.xml
+.vscode/
+
+# External native build
+.externalNativeBuild/
+.cxx/
+
+# Lint outputs
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+lint/reports/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
+
+# Keystore, signing & CI secret files
 *.jks
 *.p12
 *.keystore
 *.pem
 *.key
 keystore.properties
+signing.properties
 play-key.json
+*service-account*.json
 google-services.json
-*-service-account*.json
 .env
 .env.*
 .secure_files/
-.aider*
+
+# AI assistant local state
 .claude/
-.cursor/
 .gemini/
+.cursor/
+.codex/
+.antigravity*
+.aider*
+
+# OS & editor temp files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
