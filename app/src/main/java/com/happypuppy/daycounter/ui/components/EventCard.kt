@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -175,9 +176,10 @@ fun EventCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .defaultMinSize(minWidth = 80.dp, minHeight = 80.dp)
                         .clip(CircleShape)
-                        .background(categoryColor),
+                        .background(categoryColor)
+                        .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     // Determine text color based on category color brightness
@@ -187,7 +189,9 @@ fun EventCard(
                         text = kotlin.math.abs(daysLeft).toString(),
                         color = textColor,
                         fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 

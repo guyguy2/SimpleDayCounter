@@ -76,6 +76,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
@@ -209,7 +210,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Simple Day Counter") },
+                title = { MainTopBarTitle() },
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.Default.Event,
@@ -631,6 +632,15 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             }
         }
     }
+}
+
+@Composable
+internal fun MainTopBarTitle() {
+    Text(
+        text = "Simple Day Counter",
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
