@@ -17,7 +17,18 @@ SimpleDayCounter is a single-module Android app (`:app`, package `com.happypuppy
 ./gradlew lintRelease bundleRelease -PversionCode=N -PversionName=X.Y.Z        # release AAB (needs signing config)
 ```
 
-CI (`.github/workflows/ci.yml`) runs on JDK 21 (Temurin). Locally, the Gradle 9.6 wrapper needs a JDK 17+ `JAVA_HOME`. Tests are JVM unit tests only (`app/src/test`, with `isReturnDefaultValues = true` so `android.util.Log` does not throw, `FakeItemDao`, `kotlinx-coroutines-test`, and Turbine); there is no `app/src/androidTest` directory (the `androidTestImplementation` dependencies are declared but unused).
+Instrumented tests (`app/src/androidTest`) run on an emulator only, never on a personal device: the Compose tests wipe the app database and reset DataStore. Never run a bare `connectedDebugAndroidTest` (it installs onto every attached device) and never a bare `adb`. Name the device every time:
+
+```bash
+./gradlew assembleDebug assembleDebugAndroidTest
+adb -s emulator-5554 install -r -t app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s emulator-5554 shell am instrument -w -r com.happypuppy.daycounter.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+When two emulators share one AVD, start every instance with `-read-only`.
+
+CI (`.github/workflows/ci.yml`) runs on JDK 21 (Temurin). The Gradle daemon JVM is pinned to 21 in `gradle/gradle-daemon-jvm.properties` (written by `./gradlew updateDaemonJvm --jvm-version=21`, provisioned through the foojay toolchain resolver in `settings.gradle.kts`), and `app/build.gradle.kts` runs the unit tests on a JDK 21 launcher. The pin matters because `IsSingleGraphemeTest` needs `BreakIterator` grapheme-cluster rules from JDK 20 or later. It affects only the Gradle daemon and the test JVM: sources and bytecode still compile for JDK 17. With the pin, `./gradlew testDebugUnitTest` passes (87 tests) whether `JAVA_HOME` is JDK 17 or the Java 25 shell default (observed: Gradle then starts a JDK 21 daemon); the first run may download JDK 21. Tests are mostly JVM unit tests (`app/src/test`, with `isReturnDefaultValues = true` so `android.util.Log` does not throw, `FakeItemDao`, `kotlinx-coroutines-test`, and Turbine). `app/src/androidTest` holds instrumented tests (in-memory Room DAO, DataStore, `isSingleGrapheme` on the Android runtime, and Compose main-flow tests); they are not run by CI.
 
 Use the `android` CLI as needed for Android workflows (`android --help` / `android <cmd> --help`) — e.g. `android run` / `install`, `emulator` / `device`, `preview` (render Compose `@Preview`s without a device), `screen` / `layout` / `input`, `analyze` (APK/AAB inspection), `sdk` / `info`, and `docs`.
 
