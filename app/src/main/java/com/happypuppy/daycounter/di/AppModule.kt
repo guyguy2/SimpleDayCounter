@@ -6,9 +6,8 @@ import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.screens.EventViewModel
 import org.koin.android.ext.koin.androidContext
-import org.koin.androidx.viewmodel.dsl.viewModelOf
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
-import kotlin.jvm.java
 
 // Create a Koin module
 val appModule = module {
@@ -19,7 +18,9 @@ val appModule = module {
             AppDatabase::class.java,
             "app_database"
         )
-            .fallbackToDestructiveMigration() // For simplicity in development
+            // Allow destructive upgrade only from legacy pre-v4 dev schemas;
+            // future schema bumps (v4 -> v5+) must provide explicit Room Migrations.
+            .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3)
             .build()
     }
 

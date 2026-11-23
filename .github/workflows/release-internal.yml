@@ -87,14 +87,38 @@ jobs:
             --max-size 100M \
             --fail-on error
 
-      - name: Generate and validate release notes
+      - name: Generate and validate clean en-US release notes
         run: |
           mkdir -p app/src/main/play/release-notes/en-US
-          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          git log --pretty='- %s' "${PREV}..HEAD" | head -c 490 > app/src/main/play/release-notes/en-US/default.txt
-          if [ ! -s app/src/main/play/release-notes/en-US/default.txt ]; then
-            echo "- Maintenance and target SDK 36 update" > app/src/main/play/release-notes/en-US/default.txt
-          fi
+          python3 - <<'PY' > app/src/main/play/release-notes/en-US/default.txt
+          import re, subprocess
+          try:
+              prev = subprocess.check_output(
+                  ["git", "describe", "--tags", "--abbrev=0", "HEAD^"],
+                  stderr=subprocess.DEVNULL, text=True
+              ).strip()
+              log_args = ["git", "log", "--pretty=%s", f"{prev}..HEAD"]
+          except subprocess.CalledProcessError:
+              log_args = ["git", "log", "-n", "10", "--pretty=%s"]
+          lines = subprocess.check_output(log_args, text=True).splitlines()
+          skip_re = re.compile(r"^(wip|ci|chore|docs|build|merge\b)", re.I)
+          prefix_re = re.compile(r"^[a-z]+(\([^)]+\))?!?:\s*", re.I)
+          notes = []
+          for raw in lines:
+              s = raw.strip()
+              if not s or skip_re.match(s):
+                  continue
+              s = prefix_re.sub("", s).strip()
+              if not s:
+                  continue
+              s = s[0].upper() + s[1:]
+              bullet = f"- {s}"
+              if sum(len(x) + 1 for x in notes) + len(bullet) <= 490 and bullet not in notes:
+                  notes.append(bullet)
+          if not notes:
+              notes = ["- Updated for Android 16 (API 36) and improved stability"]
+          print("\n".join(notes))
+          PY
           COUNT=$(wc -m < app/src/main/play/release-notes/en-US/default.txt)
           [ "$COUNT" -le 500 ] || { echo "::error::Release notes exceed 500 chars ($COUNT)"; exit 1; }
 

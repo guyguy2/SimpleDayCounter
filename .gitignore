@@ -1,25 +1,36 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+/.idea/
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+.kotlin/
 
-# Signing keys, service accounts, and local tool history
+# Build outputs
+*.apk
+*.aab
+app/release/
+
+# Generated Play release notes
+app/src/main/play/release-notes/
+
+# Signing keys, service accounts, secrets, and local tool history
 *.jks
 *.p12
 *.keystore
+*.pem
+*.key
 keystore.properties
 play-key.json
+google-services.json
 *-service-account*.json
+.env
+.env.*
 .secure_files/
 .aider*
+.claude/
+.cursor/
+.gemini/

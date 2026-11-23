@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Button
@@ -41,9 +44,9 @@ import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.components.CategorySelector
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.TimeZone
+import com.happypuppy.daycounter.util.isSingleGrapheme
+import com.happypuppy.daycounter.util.localDateToUtcPickerMillis
+import com.happypuppy.daycounter.util.utcPickerMillisToLocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +54,6 @@ fun EditEventScreen(
     item: Item,
     dataStoreManager: DataStoreManager,
     onSave: (Item) -> Unit,
-    onCancel: () -> Unit,
     onDelete: (Item) -> Unit,
     navController: NavController? = null
 ) {
@@ -62,25 +64,17 @@ fun EditEventScreen(
     var emoji by rememberSaveable(item.id) { mutableStateOf(item.emoji) }
     var targetDate by rememberSaveable(item.id) { mutableStateOf(item.targetDate) }
     var selectedCategory by rememberSaveable(item.id) { mutableStateOf(item.itemCategory) }
+    var showDatePicker by rememberSaveable(item.id) { mutableStateOf(false) }
 
-    // Use rememberSaveableSheetState for the date picker dialog
-    val (showDatePicker, setShowDatePicker) = rememberSaveableSheetState(
-        "editDatePicker_${item.id}",
-        false
-    )
-
-    // Log state for debugging
     LaunchedEffect(showDatePicker) {
         if (BuildConfig.DEBUG) Log.d("EditEventScreen", "Date picker visibility for item ${item.id}: $showDatePicker")
     }
 
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = targetDate.time
-    )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .imePadding()
             .padding(16.dp)
     ) {
         Text(
@@ -108,12 +102,7 @@ fun EditEventScreen(
         OutlinedTextField(
             value = emoji,
             onValueChange = { newValue ->
-                // Only take the first emoji/character or clear it
-                if (newValue.isEmpty() || newValue.length == 1 || newValue.codePointCount(
-                        0,
-                        newValue.length
-                    ) == 1
-                ) {
+                if (isSingleGrapheme(newValue)) {
                     emoji = newValue
                 }
             },
@@ -128,7 +117,7 @@ fun EditEventScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Target date field - using the same approach as in AddEventBottomSheet
+        // Target date field
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = formatDate(targetDate, dateFormat),
@@ -151,7 +140,7 @@ fun EditEventScreen(
                     .clickable(
                         onClick = {
                             if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen date field clicked, opening picker")
-                            setShowDatePicker(true)
+                            showDatePicker = true
                         }
                     )
             )
@@ -159,7 +148,7 @@ fun EditEventScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Use the shared CategorySelector component with NavController
+        // Shared CategorySelector component with NavController
         CategorySelector(
             selectedCategory = selectedCategory,
             onCategorySelected = { category -> selectedCategory = category },
@@ -186,15 +175,17 @@ fun EditEventScreen(
 
             Button(
                 onClick = {
-                    // Create updated item with the emoji
-                    val updatedItem = item.copy(
-                        name = name,
-                        itemCategory = selectedCategory,
-                        targetDate = targetDate,
-                        emoji = emoji
-                    )
-                    onSave(updatedItem)
+                    if (name.isNotBlank()) {
+                        val updatedItem = item.copy(
+                            name = name.trim(),
+                            itemCategory = selectedCategory,
+                            targetDate = targetDate,
+                            emoji = emoji
+                        )
+                        onSave(updatedItem)
+                    }
                 },
+                enabled = name.isNotBlank(),
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Save")
@@ -204,44 +195,24 @@ fun EditEventScreen(
 
     // Date picker dialog
     if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = localDateToUtcPickerMillis(targetDate)
+        )
         DatePickerDialog(
-            onDismissRequest = { setShowDatePicker(false) },
+            onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        // Fix timezone issue by extracting just the year, month, and day
-                        // from the selected timestamp and building a new date with those components
-
-                        // Get UTC calendar
-                        val utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-                        utcCalendar.timeInMillis = selectedMillis
-
-                        // Extract year, month, day
-                        val year = utcCalendar.get(Calendar.YEAR)
-                        val month = utcCalendar.get(Calendar.MONTH)
-                        val day = utcCalendar.get(Calendar.DAY_OF_MONTH)
-
-                        // Create local calendar with the same date components
-                        val localCalendar = Calendar.getInstance()
-                        localCalendar.set(Calendar.YEAR, year)
-                        localCalendar.set(Calendar.MONTH, month)
-                        localCalendar.set(Calendar.DAY_OF_MONTH, day)
-                        // Set to noon to avoid any timezone issues
-                        localCalendar.set(Calendar.HOUR_OF_DAY, 12)
-                        localCalendar.set(Calendar.MINUTE, 0)
-                        localCalendar.set(Calendar.SECOND, 0)
-                        localCalendar.set(Calendar.MILLISECOND, 0)
-
-                        targetDate = localCalendar.time
+                        targetDate = utcPickerMillisToLocalDate(selectedMillis)
                         if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen: New date set: $targetDate")
                     }
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Confirm")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { setShowDatePicker(false) }) {
+                TextButton(onClick = { showDatePicker = false }) {
                     Text("Cancel")
                 }
             }
