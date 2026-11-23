@@ -1,9 +1,16 @@
 package com.happypuppy.daycounter.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -12,6 +19,8 @@ import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -95,6 +104,137 @@ class MainFlowInstrumentedTest {
     fun addEventFabExposesAnAccessibleName() {
         rule.onNode(hasClickAction() and (hasText("Add event") or hasContentDescription("Add event")))
             .assertExists()
+    }
+
+    // Read-only fields (UX-6): these are exercised through semantics actions, which is what a
+    // TalkBack double-tap performs, not through touch injection.
+
+    /** A node that can be clicked but exposes no text, content description or editable text. */
+    private val unlabelledClickTarget = SemanticsMatcher("clickable with no text or description") { node ->
+        val config = node.config
+        SemanticsActions.OnClick in config &&
+            SemanticsProperties.Text !in config &&
+            SemanticsProperties.EditableText !in config &&
+            SemanticsProperties.ContentDescription !in config
+    }
+
+    private fun fieldNode(label: String) = rule.onNode(hasText(label) and hasClickAction())
+
+    private fun semanticClick(label: String) {
+        fieldNode(label).performSemanticsAction(SemanticsActions.OnClick)
+    }
+
+    private fun openAddSheet() {
+        clickAddEventFab()
+        rule.waitUntilExactlyOneExists(hasText("Add New Event"), timeoutMillis = 5_000)
+    }
+
+    private fun openEditSheet(name: String) {
+        addEvent(name)
+        rule.onNodeWithText(name).performClick()
+        rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
+    }
+
+    private fun assertCategoryFieldOpensMenu() {
+        fieldNode("Category").assertExists()
+        semanticClick("Category")
+        rule.waitUntilExactlyOneExists(hasText("Work"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom...").assertExists()
+    }
+
+    private fun assertDateFieldOpensPickerAndIsASingleButton() {
+        rule.onAllNodes(hasText("Target Date")).assertCountEquals(1)
+        fieldNode("Target Date").assert(
+            SemanticsMatcher("Button role with a click label") { node ->
+                val config = node.config
+                config.getOrNull(SemanticsProperties.Role) == Role.Button &&
+                    !config.getOrNull(SemanticsActions.OnClick)?.label.isNullOrBlank()
+            }
+        )
+        semanticClick("Target Date")
+        rule.waitUntilExactlyOneExists(hasText("Confirm"), timeoutMillis = 5_000)
+    }
+
+    private fun assertNoUnlabelledClickTargets() {
+        rule.onAllNodes(unlabelledClickTarget).assertCountEquals(0)
+    }
+
+    @Test
+    fun addSheetCategoryFieldOpensItsMenuFromASemanticClick() {
+        openAddSheet()
+        assertCategoryFieldOpensMenu()
+    }
+
+    @Test
+    fun addSheetDateFieldIsOneButtonAndOpensThePicker() {
+        openAddSheet()
+        assertDateFieldOpensPickerAndIsASingleButton()
+    }
+
+    @Test
+    fun addSheetDateFieldOpensThePickerFromATouchTap() {
+        openAddSheet()
+        fieldNode("Target Date").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Confirm"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun addSheetCategoryFieldOpensItsMenuFromATouchTap() {
+        openAddSheet()
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Work"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun addSheetHasNoUnlabelledClickTargets() {
+        openAddSheet()
+        assertNoUnlabelledClickTargets()
+    }
+
+    @Test
+    fun editSheetCategoryFieldOpensItsMenuFromASemanticClick() {
+        openEditSheet("Editable")
+        assertCategoryFieldOpensMenu()
+    }
+
+    @Test
+    fun editSheetDateFieldIsOneButtonAndOpensThePicker() {
+        openEditSheet("Editable")
+        assertDateFieldOpensPickerAndIsASingleButton()
+    }
+
+    @Test
+    fun editSheetDateFieldOpensThePickerFromATouchTap() {
+        openEditSheet("Editable")
+        fieldNode("Target Date").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Confirm"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun editSheetHasNoUnlabelledClickTargets() {
+        openEditSheet("Editable")
+        assertNoUnlabelledClickTargets()
+    }
+
+    private fun openSettings() {
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Theme"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun settingsDateFormatFieldOpensItsMenuFromASemanticClick() {
+        openSettings()
+        fieldNode("Format").performScrollTo()
+        semanticClick("Format")
+        rule.waitUntil(timeoutMillis = 5_000) {
+            rule.onAllNodes(hasText("Example:", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
+    fun settingsHasNoUnlabelledClickTargets() {
+        openSettings()
+        assertNoUnlabelledClickTargets()
     }
 
     @Test
