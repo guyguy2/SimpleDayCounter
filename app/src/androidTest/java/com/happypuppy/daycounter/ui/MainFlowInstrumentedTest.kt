@@ -335,6 +335,25 @@ class MainFlowInstrumentedTest {
         rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
     }
 
+    // UX-12 (snackbar duration only): the Undo must stay reachable well past the 4 s "Short"
+    // duration. The snackbar timer runs on the test clock, so time is advanced manually.
+    @Test
+    fun undoSnackbarIsStillShownSixSecondsAfterDeleteAndUndoRestoresTheEvent() {
+        addEvent("Slow undo")
+
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithText("Slow undo").performCustomAccessibilityActionWithLabel("Delete")
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithText("Undo").assertExists()
+
+        rule.mainClock.advanceTimeBy(6_000)
+        rule.onNodeWithText("Undo").assertExists()
+
+        rule.onNodeWithText("Undo").performClick()
+        rule.mainClock.autoAdvance = true
+        rule.waitUntilExactlyOneExists(hasText("Slow undo"), timeoutMillis = 5_000)
+    }
+
     @Test
     fun pastFilterHidesTodaysEventAndClearingRestoresIt() {
         addEvent("Today only")

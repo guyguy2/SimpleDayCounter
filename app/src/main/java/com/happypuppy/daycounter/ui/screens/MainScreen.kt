@@ -197,7 +197,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             val result = snackbarHostState.showSnackbar(
                 message = "\"${deletedItem.name}\" deleted",
                 actionLabel = "Undo",
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Long
             )
             when (result) {
                 SnackbarResult.ActionPerformed -> viewModel.undoDelete()
