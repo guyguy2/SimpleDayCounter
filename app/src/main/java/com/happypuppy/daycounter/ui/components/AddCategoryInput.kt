@@ -12,10 +12,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -23,14 +25,39 @@ import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.util.Locale
+
+/**
+ * Trims leading/trailing whitespace, collapses internal whitespace runs to a single space,
+ * and title-cases each word.
+ */
+fun normalizeCategoryName(raw: String): String =
+    raw.trim()
+        .split(Regex("\\s+"))
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { ch ->
+                if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
+            }
+        }
+
+/**
+ * Returns true if [candidate] (after normalization) matches any default category or
+ * existing custom category case-insensitively.
+ */
+fun isDuplicateCategory(
+    candidate: String,
+    existingCustomCategories: Set<String> = emptySet(),
+    defaults: List<String> = defaultCategories
+): Boolean {
+    val normalized = normalizeCategoryName(candidate)
+    if (normalized.isEmpty()) return false
+    return defaults.any { it.equals(normalized, ignoreCase = true) } ||
+        existingCustomCategories.any { it.equals(normalized, ignoreCase = true) }
+}
 
 /**
  * A reusable component for adding new custom categories.
- *
- * @param dataStoreManager DataStoreManager instance for storing the new category (passed from screen root)
- * @param onCategoryAdded Callback invoked when a new category is successfully added
- * @param onCancel Callback invoked when the user cancels adding a category
- * @param placeholder Optional placeholder text for the input field
  */
 @Composable
 fun AddCategoryInput(
@@ -39,17 +66,26 @@ fun AddCategoryInput(
     onCancel: () -> Unit = {},
     placeholder: String = "Enter a new category name",
 ) {
-    var categoryText by remember { mutableStateOf("") }
+    var categoryText by rememberSaveable { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }
-    // Lifecycle-bound scope: cancelled when this composable leaves composition,
-    // unlike the former unmanaged CoroutineScope(Dispatchers.IO) (IMPROVEMENTS.md P1-4).
+    val existingCustomCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
     val scope = rememberCoroutineScope()
+
+    val isDuplicate = remember(categoryText, existingCustomCategories) {
+        isDuplicateCategory(categoryText, existingCustomCategories)
+    }
 
     OutlinedTextField(
         value = categoryText,
         onValueChange = { categoryText = it },
         label = { Text("New Category") },
         placeholder = { Text(placeholder) },
+        isError = isDuplicate,
+        supportingText = if (isDuplicate) {
+            { Text("Category already exists") }
+        } else {
+            null
+        },
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Words
@@ -68,17 +104,9 @@ fun AddCategoryInput(
                 }
                 IconButton(
                     onClick = {
-                        if (categoryText.isNotBlank()) {
-                            // Format category text
-                            val formattedCategory = categoryText.trim().split(" ")
-                                .joinToString(" ") { word ->
-                                    word.replaceFirstChar {
-                                        if (it.isLowerCase()) it.titlecase() else it.toString()
-                                    }
-                                }
-
+                        val formattedCategory = normalizeCategoryName(categoryText)
+                        if (formattedCategory.isNotEmpty() && !isDuplicate) {
                             isAdding = true
-
                             scope.launch {
                                 try {
                                     dataStoreManager.addCustomCategory(formattedCategory)
@@ -88,21 +116,19 @@ fun AddCategoryInput(
                                     throw e
                                 } catch (e: Exception) {
                                     Log.e("CategoryAdd", "Failed to add category: ${e.message}")
-                                    // Could add error handling UI here
                                 }
                                 isAdding = false
                                 categoryText = ""
                             }
                         }
                     },
-                    enabled = categoryText.isNotBlank() && !isAdding
+                    enabled = categoryText.isNotBlank() && !isDuplicate && !isAdding
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Confirm"
                     )
                 }
-
             }
         }
     )

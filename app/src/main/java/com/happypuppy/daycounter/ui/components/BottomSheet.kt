@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Button
@@ -27,6 +30,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,11 +42,11 @@ import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
-import com.happypuppy.daycounter.ui.screens.rememberSaveableSheetState
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
-import java.util.Calendar
+import com.happypuppy.daycounter.util.isSingleGrapheme
+import com.happypuppy.daycounter.util.localDateToUtcPickerMillis
+import com.happypuppy.daycounter.util.utcPickerMillisToLocalDate
 import java.util.Date
-import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,29 +59,21 @@ fun AddEventBottomSheet(
     val dateFormat = LocalDateFormat.current
 
     // Use rememberSaveable to preserve state across configuration changes
-    var eventName by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
-    var eventEmoji by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
-    val calendar = Calendar.getInstance()
-    val initialTargetDate = calendar.time
-    var targetDate by rememberSaveable { androidx.compose.runtime.mutableStateOf(initialTargetDate) }
-    var selectedCategory by rememberSaveable { androidx.compose.runtime.mutableStateOf("Personal") }
+    var eventName by rememberSaveable { mutableStateOf("") }
+    var eventEmoji by rememberSaveable { mutableStateOf("") }
+    var targetDate by rememberSaveable { mutableStateOf(Date()) }
+    var selectedCategory by rememberSaveable { mutableStateOf("Personal") }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
-    // Use BottomSheetStateSaver for the date picker state
-    val (showDatePicker, setShowDatePicker) = rememberSaveableSheetState("addEventDatePicker", false)
-
-    // Debug statement to confirm when date picker state changes
     LaunchedEffect(showDatePicker) {
         if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker visibility changed to: $showDatePicker")
     }
 
-    // Initialize date picker with current time
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = targetDate.time
-    )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .imePadding()
             .padding(16.dp)
     ) {
         Text(
@@ -105,8 +101,7 @@ fun AddEventBottomSheet(
         OutlinedTextField(
             value = eventEmoji,
             onValueChange = { newValue ->
-                // Only take the first emoji/character or clear it
-                if (newValue.isEmpty() || newValue.length == 1 || newValue.codePointCount(0, newValue.length) == 1) {
+                if (isSingleGrapheme(newValue)) {
                     eventEmoji = newValue
                 }
             },
@@ -140,11 +135,11 @@ fun AddEventBottomSheet(
             // Invisible clickable overlay that sits on top of the field
             Box(
                 modifier = Modifier
-                    .matchParentSize() // This makes it exactly the same size as its parent Box
+                    .matchParentSize()
                     .clickable(
                         onClick = {
                             if (BuildConfig.DEBUG) Log.d("DatePicker", "Date field clicked, opening picker")
-                            setShowDatePicker(true)
+                            showDatePicker = true
                         }
                     )
             )
@@ -178,8 +173,7 @@ fun AddEventBottomSheet(
                 onClick = {
                     if (eventName.isNotBlank()) {
                         if (BuildConfig.DEBUG) Log.d("AddEvent", "Saving event: $eventName, date: $targetDate, category: $selectedCategory, emoji: $eventEmoji")
-                        onSave(eventName, targetDate, selectedCategory, eventEmoji)
-                        onDismiss()
+                        onSave(eventName.trim(), targetDate, selectedCategory, eventEmoji)
                     }
                 },
                 enabled = eventName.isNotBlank()
@@ -191,43 +185,23 @@ fun AddEventBottomSheet(
 
     // Date picker dialog
     if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = localDateToUtcPickerMillis(targetDate)
+        )
         if (BuildConfig.DEBUG) Log.d("DatePicker", "Showing date picker dialog")
         DatePickerDialog(
             onDismissRequest = {
                 if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker dismissed")
-                setShowDatePicker(false)
+                showDatePicker = false
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (BuildConfig.DEBUG) Log.d("DatePicker", "Date selection confirmed")
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        // This fixes the timezone issue by extracting just the year, month, and day
-                        // from the selected timestamp and building a new date with those components
-
-                        // Get UTC calendar
-                        val utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-                        utcCalendar.timeInMillis = selectedMillis
-
-                        // Extract year, month, day
-                        val year = utcCalendar.get(Calendar.YEAR)
-                        val month = utcCalendar.get(Calendar.MONTH)
-                        val day = utcCalendar.get(Calendar.DAY_OF_MONTH)
-
-                        // Create local calendar with the same date components
-                        val localCalendar = Calendar.getInstance()
-                        localCalendar.set(Calendar.YEAR, year)
-                        localCalendar.set(Calendar.MONTH, month)
-                        localCalendar.set(Calendar.DAY_OF_MONTH, day)
-                        // Set to noon to avoid any timezone issues
-                        localCalendar.set(Calendar.HOUR_OF_DAY, 12)
-                        localCalendar.set(Calendar.MINUTE, 0)
-                        localCalendar.set(Calendar.SECOND, 0)
-                        localCalendar.set(Calendar.MILLISECOND, 0)
-
-                        targetDate = localCalendar.time
+                        targetDate = utcPickerMillisToLocalDate(selectedMillis)
                         if (BuildConfig.DEBUG) Log.d("DatePicker", "New date set: $targetDate")
                     }
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Confirm")
                 }
@@ -235,7 +209,7 @@ fun AddEventBottomSheet(
             dismissButton = {
                 TextButton(onClick = {
                     if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker cancelled")
-                    setShowDatePicker(false)
+                    showDatePicker = false
                 }) {
                     Text("Cancel")
                 }

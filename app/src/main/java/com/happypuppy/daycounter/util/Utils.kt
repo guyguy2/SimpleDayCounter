@@ -6,8 +6,14 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import androidx.compose.ui.graphics.Color
-import java.util.Calendar
+import java.text.BreakIterator
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.util.Date
+import java.util.Locale
 
 /** One-shot haptic feedback. minSdk 31 guarantees [VibratorManager]. */
 fun vibrate(context: Context, durationMs: Long = 100) {
@@ -73,28 +79,55 @@ object AppVersionInfo {
     }
 }
 
-fun calculateDaysLeft(targetDate: Date): Int {
-    // Create calendar instances
-    val targetCalendar = Calendar.getInstance()
-    targetCalendar.time = targetDate
+/**
+ * Computes the signed calendar-day difference between [today] and [targetDate] in [zoneId].
+ * Uses `java.time.LocalDate` + [ChronoUnit.DAYS] so DST spring-forward (23h) and fall-back (25h)
+ * transitions never cause off-by-one errors.
+ */
+fun calculateDaysLeft(
+    targetDate: Date,
+    today: LocalDate = LocalDate.now(),
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Int {
+    val targetLocalDate = targetDate.toInstant().atZone(zoneId).toLocalDate()
+    return ChronoUnit.DAYS.between(today, targetLocalDate).toInt()
+}
 
-    // Set time to beginning of day
-    targetCalendar.set(Calendar.HOUR_OF_DAY, 0)
-    targetCalendar.set(Calendar.MINUTE, 0)
-    targetCalendar.set(Calendar.SECOND, 0)
-    targetCalendar.set(Calendar.MILLISECOND, 0)
+/**
+ * Converts a local [Date] into UTC midnight milliseconds for the same calendar date in [zoneId],
+ * matching what Material3's `DatePicker` expects for `initialSelectedDateMillis`.
+ */
+fun localDateToUtcPickerMillis(
+    date: Date,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Long {
+    val localDate = date.toInstant().atZone(zoneId).toLocalDate()
+    return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
 
-    // Current date with time set to beginning of day
-    val currentCalendar = Calendar.getInstance()
-    currentCalendar.set(Calendar.HOUR_OF_DAY, 0)
-    currentCalendar.set(Calendar.MINUTE, 0)
-    currentCalendar.set(Calendar.SECOND, 0)
-    currentCalendar.set(Calendar.MILLISECOND, 0)
+/**
+ * Converts a UTC midnight millisecond timestamp from Material3's `DatePicker` into a [Date]
+ * anchored at 12:00 local time in [zoneId] on that calendar date.
+ */
+fun utcPickerMillisToLocalDate(
+    utcMillis: Long,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Date {
+    val localDate = Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()
+    return Date.from(localDate.atTime(12, 0).atZone(zoneId).toInstant())
+}
 
-    // Calculate difference in days
-    val millisecondsInDay = 24 * 60 * 60 * 1000L
-    val diffInMillis = targetCalendar.timeInMillis - currentCalendar.timeInMillis
-    return (diffInMillis / millisecondsInDay).toInt()
+/**
+ * Returns true if [text] is empty or contains exactly one user-perceived grapheme cluster
+ * (supporting variation-selector emojis like ❤️/☀️, flags like 🇺🇸, skin-tone modifiers like 👍🏽,
+ * and ZWJ sequences like 👨‍👩‍👧).
+ */
+fun isSingleGrapheme(text: String): Boolean {
+    if (text.isEmpty()) return true
+    val iterator = BreakIterator.getCharacterInstance(Locale.ROOT)
+    iterator.setText(text)
+    val firstEnd = iterator.next()
+    return firstEnd != BreakIterator.DONE && iterator.next() == BreakIterator.DONE
 }
 
 fun isColorBright(color: Color): Boolean {

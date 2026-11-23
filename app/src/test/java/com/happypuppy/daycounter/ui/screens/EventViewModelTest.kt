@@ -20,21 +20,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 import java.util.Date
 
-/**
- * Unit tests for [EventViewModel].
- *
- * `UnconfinedTestDispatcher` is installed as Main so the `viewModelScope` launches
- * complete eagerly and the resulting state can be asserted without explicit
- * `advanceUntilIdle` plumbing for the simple cases. `deleteItem` schedules a
- * `delay(200)` between the optimistic UI update and the DB write, so those tests
- * advance virtual time explicitly to assert the two-phase behavior.
- *
- * The ViewModel is driven through an in-memory [FakeItemDao] wrapped in the real
- * [ItemRepository] (which is a thin pass-through), keeping the test independent of
- * Room and any Android framework dependencies.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventViewModelTest {
 
@@ -54,8 +42,44 @@ class EventViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun item(id: Int, name: String = "event-$id"): Item =
-        Item(id = id, name = name, itemCategory = "Personal", targetDate = Date())
+    private fun item(id: Int, name: String = "event-$id", category: String = "Personal", emoji: String = ""): Item =
+        Item(id = id, name = name, itemCategory = category, targetDate = Date(1_700_000_000_000L), emoji = emoji)
+
+    @Test
+    fun `saveItem inserts new item into repository and updates uiState`() = runTest(dispatcher) {
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        val target = Date(1_800_000_000_000L)
+        viewModel.saveItem(name = "Vacation", category = "Personal", targetDate = target, emoji = "✈️")
+        advanceUntilIdle()
+
+        val items = viewModel.uiState.value.items
+        assertEquals(1, items.size)
+        assertEquals("Vacation", items.first().name)
+        assertEquals("Personal", items.first().itemCategory)
+        assertEquals(target, items.first().targetDate)
+        assertEquals("✈️", items.first().emoji)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `updateItem replaces existing item in repository`() = runTest(dispatcher) {
+        val original = item(id = 12, name = "Old Name", category = "Work", emoji = "💼")
+        dao.insertItem(original)
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        val updated = original.copy(name = "New Name", itemCategory = "Health", emoji = "🏃")
+        viewModel.updateItem(updated)
+        advanceUntilIdle()
+
+        val items = viewModel.uiState.value.items
+        assertEquals(1, items.size)
+        assertEquals("New Name", items.first().name)
+        assertEquals("Health", items.first().itemCategory)
+        assertEquals("🏃", items.first().emoji)
+    }
 
     @Test
     fun `deleteItem sets snackbar and lastDeletedItem before removing from repository`() = runTest(dispatcher) {
@@ -64,23 +88,44 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(1, "to-delete"))
-        // Run the part of the launched coroutine that executes before `delay(200)`.
         runCurrent()
 
-        // Optimistic UI update happens before the 200ms delay.
         val mid = viewModel.uiState.value
         assertTrue("snackbar should be visible immediately after deleteItem", mid.showUndoSnackbar)
         assertNotNull("lastDeletedItem should be populated immediately", mid.lastDeletedItem)
         assertEquals(1, mid.lastDeletedItem?.id)
-        // Repository write is deferred behind delay(200), so the list is still intact.
+        assertTrue("snackbarToken should be positive", mid.snackbarToken > 0L)
         assertEquals(1, mid.items.size)
 
-        // After the animation delay, the item is removed from the underlying store.
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         val final = viewModel.uiState.value
         assertTrue(final.items.isEmpty())
         assertTrue("snackbar remains visible until dismissed or undone", final.showUndoSnackbar)
+    }
+
+    @Test
+    fun `undoDelete within delete delay cancels pending deletion so item stays present`() = runTest(dispatcher) {
+        val target = item(42, "race-test")
+        dao.insertItem(target)
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.deleteItem(target)
+        // Undo before the 200ms delete delay expires.
+        advanceTimeBy(100L)
+        runCurrent()
+        viewModel.undoDelete()
+
+        // Advance well past both delete delay and restoration key TTL.
+        advanceTimeBy(1_000L)
+        advanceUntilIdle()
+
+        assertEquals("item must NOT be deleted after rapid undo", 1, dao.currentItems.size)
+        assertEquals(42, dao.currentItems.first().id)
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertFalse(viewModel.uiState.value.showUndoSnackbar)
+        assertNull(viewModel.uiState.value.lastDeletedItem)
     }
 
     @Test
@@ -90,14 +135,12 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(7, "boom"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
-        // Sanity check: snackbar is visible, item is gone from the store.
         assertTrue(viewModel.uiState.value.showUndoSnackbar)
         assertTrue(viewModel.uiState.value.items.isEmpty())
 
         viewModel.undoDelete()
-        // runCurrent flushes work up to the auto-expire delay without draining the TTL.
         runCurrent()
 
         val state = viewModel.uiState.value
@@ -118,7 +161,7 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(3, "fleeting"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showUndoSnackbar)
 
@@ -127,34 +170,32 @@ class EventViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.showUndoSnackbar)
         assertNull(state.lastDeletedItem)
-        // Dismissal does not restore the deleted item.
         assertTrue(state.items.isEmpty())
     }
 
     @Test
-    fun `multiple deleteItem calls track only the most recently deleted item`() = runTest(dispatcher) {
+    fun `consecutive deletes advance snackbarToken and track most recently deleted item`() = runTest(dispatcher) {
         dao.insertItem(item(10, "first"))
         dao.insertItem(item(20, "second"))
         val viewModel = EventViewModel(repository)
         advanceUntilIdle()
 
         viewModel.deleteItem(item(10, "first"))
-        advanceTimeBy(250)
-        advanceUntilIdle()
+        runCurrent()
+        val firstToken = viewModel.uiState.value.snackbarToken
         assertEquals(10, viewModel.uiState.value.lastDeletedItem?.id)
 
+        // Immediately delete second item while first snackbar is still active.
         viewModel.deleteItem(item(20, "second"))
-        advanceTimeBy(250)
-        advanceUntilIdle()
+        runCurrent()
+        val secondToken = viewModel.uiState.value.snackbarToken
+        assertTrue("consecutive deletes must produce a strictly newer snackbarToken", secondToken > firstToken)
+        assertEquals(20, viewModel.uiState.value.lastDeletedItem?.id)
+        assertTrue(viewModel.uiState.value.showUndoSnackbar)
 
-        val state = viewModel.uiState.value
-        assertEquals(
-            "lastDeletedItem should track the most recent delete",
-            20,
-            state.lastDeletedItem?.id
-        )
-        assertTrue(state.showUndoSnackbar)
-        assertTrue("both items should be gone from the store", state.items.isEmpty())
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
+        advanceUntilIdle()
+        assertTrue("both items should be gone from the store", viewModel.uiState.value.items.isEmpty())
     }
 
     @Test
@@ -165,15 +206,13 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(1, "a"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         runCurrent()
         viewModel.undoDelete()
         runCurrent()
 
-        // Avoid advanceUntilIdle after the first undo - it would drain the TTL and
-        // auto-clear key 1 before we assert both keys are present.
         viewModel.deleteItem(item(2, "b"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         runCurrent()
         viewModel.undoDelete()
         runCurrent()
@@ -193,56 +232,42 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(1, "only"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         viewModel.undoDelete()
         runCurrent()
 
         assertEquals(setOf(1), viewModel.uiState.value.restoredItemKeys.keys)
 
-        // Clearing an id that was never restored should leave the map untouched.
         viewModel.clearRestorationKey(999)
         runCurrent()
 
-        assertEquals(
-            "clearRestorationKey for an unknown id should not mutate the map",
-            setOf(1),
-            viewModel.uiState.value.restoredItemKeys.keys
-        )
+        assertEquals(setOf(1), viewModel.uiState.value.restoredItemKeys.keys)
     }
 
     @Test
-    fun `undoing the same id twice refreshes its restoration key`() = runTest(dispatcher) {
+    fun `undoing the same id twice produces strictly increasing monotonic restoration keys`() = runTest(dispatcher) {
         dao.insertItem(item(5, "again"))
         val viewModel = EventViewModel(repository)
         advanceUntilIdle()
 
-        // First delete + undo cycle.
         viewModel.deleteItem(item(5, "again"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         viewModel.undoDelete()
         runCurrent()
         val firstKey = viewModel.uiState.value.restoredItemKeys[5]
         assertNotNull("first undo should set a restoration key", firstKey)
 
-        // The key is a wall-clock millisecond timestamp; force a measurable gap so
-        // the second key cannot collide with the first.
-        Thread.sleep(2)
-
-        // Second delete + undo cycle for the same id.
-        // advanceTimeBy for deleteItem's delay(200) also drains part of the first
-        // undo's TTL; the timestamp-identity check must keep the second key alive.
+        // No Thread.sleep needed — tokenGenerator is a monotonic AtomicLong.
         viewModel.deleteItem(item(5, "again"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         viewModel.undoDelete()
         runCurrent()
         val secondKey = viewModel.uiState.value.restoredItemKeys[5]
         assertNotNull("second undo should set a restoration key", secondKey)
 
-        // A fresh key forces LazyColumn to remount the row so the swipe-restore
-        // animation replays. If the key were sticky the row would not animate again.
         assertTrue(
             "subsequent undo must produce a strictly newer restoration key",
             secondKey!! > firstKey!!
@@ -257,14 +282,13 @@ class EventViewModelTest {
         advanceUntilIdle()
 
         viewModel.deleteItem(item(9, "temp-key"))
-        advanceTimeBy(250)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         viewModel.undoDelete()
-        // Do not advanceUntilIdle here - that would drain the TTL delay immediately.
         runCurrent()
 
         assertTrue(
-            "key must be present immediately after undo (LazyColumn re-key window)",
+            "key must be present immediately after undo",
             viewModel.uiState.value.restoredItemKeys.containsKey(9)
         )
 
@@ -278,13 +302,49 @@ class EventViewModelTest {
     }
 
     @Test
+    fun `database read error propagates to uiState error and clears loading`() = runTest(dispatcher) {
+        val failingDao = FakeItemDao(flowError = IOException("Disk corrupted"))
+        val viewModel = EventViewModel(ItemRepository(failingDao))
+        advanceUntilIdle()
+
+        assertEquals("Disk corrupted", viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+
+        viewModel.clearError()
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `database write errors on save, update, and delete propagate to uiState error`() = runTest(dispatcher) {
+        val existing = item(1, "existing")
+        dao.insertItem(existing)
+        val viewModel = EventViewModel(repository)
+        advanceUntilIdle()
+
+        dao.insertError = IOException("Insert failed")
+        viewModel.saveItem("New", "Work", Date())
+        advanceUntilIdle()
+        assertEquals("Insert failed", viewModel.uiState.value.error)
+
+        viewModel.clearError()
+        viewModel.updateItem(existing.copy(name = "Edited"))
+        advanceUntilIdle()
+        assertEquals("Insert failed", viewModel.uiState.value.error)
+
+        dao.insertError = null
+        dao.deleteError = IOException("Delete failed")
+        viewModel.deleteItem(existing)
+        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
+        advanceUntilIdle()
+        assertEquals("Delete failed", viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `uiState emits initial items via Turbine`() = runTest(dispatcher) {
         dao.insertItem(item(42, "seeded"))
         val viewModel = EventViewModel(repository)
 
         viewModel.uiState.test {
-            // The init block kicks off getAllItems on the Unconfined dispatcher, so the
-            // first emission we observe already contains the seeded item.
             advanceUntilIdle()
             val state = expectMostRecentItem()
             assertEquals(1, state.items.size)

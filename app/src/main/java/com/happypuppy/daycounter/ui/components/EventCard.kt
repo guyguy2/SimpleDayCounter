@@ -126,10 +126,10 @@ fun EventCard(
                     modifier = Modifier.padding(end = 4.dp)
                 )
             } else {
-                // Show default category icon
+                // Show default category icon (decorative; category name is shown in text)
                 Icon(
                     imageVector = categoryIcon,
-                    contentDescription = "Category Icon",
+                    contentDescription = null,
                     tint = categoryColor,
                     modifier = Modifier.size(40.dp)
                 )
