@@ -28,7 +28,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,7 +91,6 @@ class MainFlowInstrumentedTest {
         rule.waitUntilExactlyOneExists(hasText(name), timeoutMillis = 5_000)
     }
 
-    @Ignore("Known a11y gap (PLAN.md P0): the Add event FAB has no accessible name. Remove @Ignore once fixed.")
     @Test
     fun addEventFabExposesAnAccessibleName() {
         rule.onNode(hasClickAction() and (hasText("Add event") or hasContentDescription("Add event")))

@@ -71,11 +71,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
@@ -433,8 +437,10 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             )
         },
         floatingActionButton = {
+            val addEventLabel = stringResource(R.string.add_event)
             ExtendedFloatingActionButton(
                 onClick = { showAddEventSheet = true },
+                modifier = Modifier.semantics { contentDescription = addEventLabel },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 icon = {
@@ -444,7 +450,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     )
                 },
                 text = {
-                    Text("Add event")
+                    Text(addEventLabel)
                 }
             )
         }
