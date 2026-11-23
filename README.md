@@ -74,3 +74,7 @@ app/src/main/java/com/happypuppy/daycounter/
 │   └── theme/         # Material 3 Light/Dark themes and CategoryColors
 └── util/              # DST-safe day count math, UTC DatePicker helpers, grapheme/emoji & color helpers
 ```
+
+## License
+
+[MIT](LICENSE)
