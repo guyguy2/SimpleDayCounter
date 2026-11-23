@@ -101,6 +101,17 @@ kotlin {
     }
 }
 
+// Run unit tests on JDK 21 (matches CI). BreakIterator only follows extended grapheme
+// clusters from JDK 20, which IsSingleGraphemeTest relies on. Test JVM only: compile
+// and bytecode targets stay at 17.
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    )
+}
+
 room {
     schemaDirectory("$projectDir/schemas")
 }
