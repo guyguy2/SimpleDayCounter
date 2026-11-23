@@ -667,6 +667,18 @@ fun SwipeToDeleteItem(
         positionalThreshold = { it * 0.5f }
     )
 
+    // Shared by the swipe gesture and the card's "Delete" accessibility action.
+    val deleteOnce = {
+        if (!isRemoved) {
+            isRemoved = true
+            if (isVibrationEnabled) {
+                vibrate(context)
+            }
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
+            onDelete()
+        }
+    }
+
     AnimatedVisibility(
         visible = !isRemoved,
         enter = fadeIn(),
@@ -676,14 +688,7 @@ fun SwipeToDeleteItem(
             state = dismissState,
             onDismiss = { value ->
                 if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
-                    if (!isRemoved) {
-                        isRemoved = true
-                        if (isVibrationEnabled) {
-                            vibrate(context)
-                        }
-                        if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
-                        onDelete()
-                    }
+                    deleteOnce()
                 }
             },
             backgroundContent = {
@@ -712,7 +717,7 @@ fun SwipeToDeleteItem(
                 }
             }
         ) {
-            EventCard(item = item, onClick = onClick)
+            EventCard(item = item, onClick = onClick, onDelete = deleteOnce)
         }
     }
 }

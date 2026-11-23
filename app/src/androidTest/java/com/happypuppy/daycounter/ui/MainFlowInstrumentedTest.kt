@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -85,8 +86,8 @@ class MainFlowInstrumentedTest {
 
     /**
      * The FAB label is looked up in the UNMERGED tree: in Material3 1.5.0 the label Text sits under
-     * a node with clearAndSetSemantics, so the merged FAB button has no text (see the @Ignore test
-     * below and PLAN.md).
+     * a node with clearAndSetSemantics, so the merged FAB button has no text (see
+     * addEventFabExposesAnAccessibleName below and PLAN.md).
      */
     private fun clickAddEventFab() {
         rule.onNode(hasText("Add event"), useUnmergedTree = true).performClick()
@@ -297,6 +298,41 @@ class MainFlowInstrumentedTest {
 
         rule.waitUntilExactlyOneExists(hasText("Undo"), timeoutMillis = 5_000)
         rule.onNodeWithText("\"Swiped\" deleted").assertExists()
+    }
+
+    // UX-20: swipe must not be the only way to delete; cards expose custom accessibility actions.
+    @Test
+    fun deleteCustomActionRemovesTheEventAndShowsUndo() {
+        addEvent("Actioned")
+
+        rule.onNodeWithText("Actioned").performCustomAccessibilityActionWithLabel("Delete")
+
+        rule.waitUntilExactlyOneExists(hasText("Undo"), timeoutMillis = 5_000)
+        rule.onNodeWithText("\"Actioned\" deleted").assertExists()
+
+        rule.onNodeWithText("Undo").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Actioned"), timeoutMillis = 5_000)
+    }
+
+    // Edit is reachable without touch through the card's labelled click action (what a TalkBack
+    // double-tap performs), and the custom actions list Delete once and no duplicate Edit.
+    @Test
+    fun editIsReachableWithoutTouchAndTheCardActionsAreNotDuplicated() {
+        addEvent("Actioned")
+
+        rule.onNodeWithText("Actioned").assert(
+            SemanticsMatcher("one Delete custom action, no custom Edit, click labelled 'Edit event'") { node ->
+                val config = node.config
+                val customLabels = config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
+                customLabels.count { it == "Delete" } == 1 &&
+                    customLabels.none { it == "Edit" } &&
+                    config.getOrNull(SemanticsActions.OnClick)?.label == "Edit event"
+            }
+        )
+
+        rule.onNodeWithText("Actioned").performSemanticsAction(SemanticsActions.OnClick)
+
+        rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
     }
 
     @Test

@@ -31,7 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,7 +55,8 @@ import com.happypuppy.daycounter.util.isColorBright
 @Composable
 fun EventCard(
     item: Item,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     val daysLeft = calculateDaysLeft(item.targetDate)
 
@@ -92,10 +96,17 @@ fun EventCard(
         else -> Icons.Default.Event // Default icon for custom categories
     }
 
+    // Swipe is not available to every user, so expose Delete as an accessibility action too.
+    // Edit is the card's labelled click ("Edit event"), so it is not repeated as a custom action.
+    val accessibilityActions = buildList {
+        if (onDelete != null) add(CustomAccessibilityAction("Delete") { onDelete(); true })
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClickLabel = "Edit event") { onClick() },
+            .clickable(role = Role.Button, onClickLabel = "Edit event") { onClick() }
+            .semantics { customActions = accessibilityActions },
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor,
             contentColor = primaryTextColor
