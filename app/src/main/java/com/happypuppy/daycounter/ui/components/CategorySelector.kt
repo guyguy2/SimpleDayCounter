@@ -1,14 +1,14 @@
 package com.happypuppy.daycounter.ui.components
 
-import android.util.Log
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.theme.CategoryColors
@@ -29,6 +28,7 @@ import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 // Predefined default categories
 val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategorySelector(
     selectedCategory: String,
@@ -51,13 +51,19 @@ fun CategorySelector(
     }
 
     Column(modifier = modifier) {
-        // Category selection field with clickable overlay
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // Category selection field: the field itself is the single focus target and menu anchor.
+        ExposedDropdownMenuBox(
+            expanded = showCategoryDropdown,
+            onExpandedChange = { showCategoryDropdown = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             OutlinedTextField(
                 value = selectedCategory,
                 onValueChange = { /* readonly */ },
                 label = { Text("Category") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth(),
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
@@ -73,23 +79,10 @@ fun CategorySelector(
                 readOnly = true
             )
 
-            // Invisible clickable overlay that covers the whole field
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clickable(
-                        onClick = {
-                            if (BuildConfig.DEBUG) Log.d("CategorySelector", "Category field clicked, opening dropdown")
-                            showCategoryDropdown = true
-                        }
-                    )
-            )
-
             // Category dropdown
-            DropdownMenu(
+            ExposedDropdownMenu(
                 expanded = showCategoryDropdown,
-                onDismissRequest = { showCategoryDropdown = false },
-                modifier = Modifier.fillMaxWidth(0.9f)
+                onDismissRequest = { showCategoryDropdown = false }
             ) {
                 allCategories.forEach { category ->
                     DropdownMenuItem(

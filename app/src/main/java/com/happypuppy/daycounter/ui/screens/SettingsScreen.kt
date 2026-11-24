@@ -4,7 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,9 +31,11 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -429,6 +430,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateFormatSetting(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
@@ -462,7 +464,11 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
 
             val formattedDate = formatDate(sampleDate, currentFormat)
 
-            Box(modifier = Modifier.fillMaxWidth()) {
+            ExposedDropdownMenuBox(
+                expanded = showFormatOptions,
+                onExpandedChange = { showFormatOptions = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 OutlinedTextField(
                     value = currentFormat.displayName,
                     onValueChange = { },
@@ -473,20 +479,15 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                             contentDescription = "Select Format"
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
                     readOnly = true
                 )
 
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable(onClick = { showFormatOptions = true })
-                )
-
-                DropdownMenu(
+                ExposedDropdownMenu(
                     expanded = showFormatOptions,
-                    onDismissRequest = { showFormatOptions = false },
-                    modifier = Modifier.fillMaxWidth(0.9f)
+                    onDismissRequest = { showFormatOptions = false }
                 ) {
                     DateFormat.entries.forEach { format ->
                         DropdownMenuItem(

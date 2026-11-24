@@ -71,11 +71,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
@@ -192,7 +197,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             val result = snackbarHostState.showSnackbar(
                 message = "\"${deletedItem.name}\" deleted",
                 actionLabel = "Undo",
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Long
             )
             when (result) {
                 SnackbarResult.ActionPerformed -> viewModel.undoDelete()
@@ -205,7 +210,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Simple Day Counter") },
+                title = { MainTopBarTitle() },
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.Default.Event,
@@ -433,8 +438,10 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
             )
         },
         floatingActionButton = {
+            val addEventLabel = stringResource(R.string.add_event)
             ExtendedFloatingActionButton(
                 onClick = { showAddEventSheet = true },
+                modifier = Modifier.semantics { contentDescription = addEventLabel },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 icon = {
@@ -444,7 +451,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     )
                 },
                 text = {
-                    Text("Add event")
+                    Text(addEventLabel)
                 }
             )
         }
@@ -627,6 +634,15 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
     }
 }
 
+@Composable
+internal fun MainTopBarTitle() {
+    Text(
+        text = "Simple Day Counter",
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteItem(
@@ -651,6 +667,18 @@ fun SwipeToDeleteItem(
         positionalThreshold = { it * 0.5f }
     )
 
+    // Shared by the swipe gesture and the card's "Delete" accessibility action.
+    val deleteOnce = {
+        if (!isRemoved) {
+            isRemoved = true
+            if (isVibrationEnabled) {
+                vibrate(context)
+            }
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
+            onDelete()
+        }
+    }
+
     AnimatedVisibility(
         visible = !isRemoved,
         enter = fadeIn(),
@@ -660,14 +688,7 @@ fun SwipeToDeleteItem(
             state = dismissState,
             onDismiss = { value ->
                 if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
-                    if (!isRemoved) {
-                        isRemoved = true
-                        if (isVibrationEnabled) {
-                            vibrate(context)
-                        }
-                        if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
-                        onDelete()
-                    }
+                    deleteOnce()
                 }
             },
             backgroundContent = {
@@ -696,7 +717,7 @@ fun SwipeToDeleteItem(
                 }
             }
         ) {
-            EventCard(item = item, onClick = onClick)
+            EventCard(item = item, onClick = onClick, onDelete = deleteOnce)
         }
     }
 }
