@@ -1,4 +1,13 @@
 <resources>
     <string name="app_name">Simple Day Counter</string>
     <string name="add_event">Add event</string>
+    <string name="event_card_today">Today!</string>
+    <plurals name="event_card_days_left">
+        <item quantity="one">day left</item>
+        <item quantity="other">days left</item>
+    </plurals>
+    <plurals name="event_card_days_past">
+        <item quantity="one">day past</item>
+        <item quantity="other">days past</item>
+    </plurals>
 </resources>

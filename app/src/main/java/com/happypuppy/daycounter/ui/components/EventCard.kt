@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.theme.CategoryColors
@@ -212,9 +215,9 @@ fun EventCard(
 
                 Text(
                     text = when (val label = dayLabelFor(daysLeft)) {
-                        DayLabel.Today -> "Today!"
-                        is DayLabel.Left -> if (label.days == 1) "day left" else "days left"
-                        is DayLabel.Past -> if (label.days == 1) "day past" else "days past"
+                        DayLabel.Today -> stringResource(R.string.event_card_today)
+                        is DayLabel.Left -> pluralStringResource(R.plurals.event_card_days_left, label.days)
+                        is DayLabel.Past -> pluralStringResource(R.plurals.event_card_days_past, label.days)
                     },
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center
