@@ -1,5 +1,6 @@
 package com.happypuppy.daycounter.data.preferences
 
+import com.happypuppy.daycounter.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,7 +35,8 @@ class PreferenceEnumsTest {
     fun `persisted preference value strings are frozen`() {
         // Changing any of these silently resets users to the default after an update.
         assertEquals(listOf("system_default", "light", "dark"), AppTheme.entries.map { it.value })
-        assertEquals(listOf("default", "us", "eu", "iso", "full"), DateFormat.entries.map { it.value })
+        // "system" was added after the five patterns; the five existing values must never change.
+        assertEquals(listOf("system", "default", "us", "eu", "iso", "full"), DateFormat.entries.map { it.value })
     }
 
     @Test
@@ -49,6 +51,8 @@ class PreferenceEnumsTest {
             for (format in DateFormat.entries) {
                 // Convention: the display name of format "iso" is the string resource date_format_iso.
                 val displayName = names.getValue("date_format_${format.value}")
+                // The system option has no fixed example: its text follows the device locale.
+                if (format == DateFormat.SYSTEM) continue
                 val example = displayName.substringAfter('(').substringBefore(')')
                 assertEquals("example in '$displayName'", example, formatDate(sample, format))
             }
@@ -61,6 +65,15 @@ class PreferenceEnumsTest {
     @Test
     fun `every date format has its own display name resource`() {
         assertEquals(DateFormat.entries.size, DateFormat.entries.map { it.displayNameRes }.toSet().size)
+    }
+
+    @Test
+    fun `each date format points at the display name resource named after its value`() {
+        // A swapped reference (US showing the EU name) must fail: look the id up by name.
+        for (format in DateFormat.entries) {
+            val expected = R.string::class.java.getField("date_format_${format.value}").getInt(null)
+            assertEquals("display name of '${format.value}'", expected, format.displayNameRes)
+        }
     }
 
     /** Reads the English display names straight from strings.xml (the JVM has no Android resources). */
@@ -77,7 +90,7 @@ class PreferenceEnumsTest {
     fun `date format patterns never use the week-year field`() {
         // 'YYYY' (week year) is a classic SimpleDateFormat bug around New Year.
         DateFormat.entries.forEach {
-            assertTrue("${it.value}: ${it.formatPattern}", !it.formatPattern.contains("YYYY"))
+            assertTrue("${it.value}: ${it.formatPattern}", it.formatPattern?.contains("YYYY") != true)
         }
     }
 }

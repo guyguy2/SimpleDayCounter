@@ -62,4 +62,31 @@ class FormatDateCharacterizationTest {
 
         assertEquals("Januar 5, 2026", formatDate(singleDigitDay, DateFormat.FULL))
     }
+
+    @Test
+    fun `system default follows the device locale for the order, separators and month names`() {
+        val sample = Date.from(LocalDateTime.of(2026, 12, 31, 12, 0).toInstant(ZoneOffset.UTC))
+
+        assertEquals("Dec 31, 2026", formatDate(sample, DateFormat.SYSTEM, Locale.US))
+        assertEquals("31 Dec 2026", formatDate(sample, DateFormat.SYSTEM, Locale.UK))
+        assertEquals("31.12.2026", formatDate(sample, DateFormat.SYSTEM, Locale.GERMANY))
+        assertEquals("31 d\u00e9c. 2026", formatDate(sample, DateFormat.SYSTEM, Locale.FRANCE))
+        assertEquals("2026/12/31", formatDate(sample, DateFormat.SYSTEM, Locale.JAPAN))
+    }
+
+    @Test
+    fun `system default uses the default locale when none is passed`() {
+        val sample = Date.from(LocalDateTime.of(2026, 12, 31, 12, 0).toInstant(ZoneOffset.UTC))
+        Locale.setDefault(Locale.GERMANY)
+
+        assertEquals("31.12.2026", formatDate(sample, DateFormat.SYSTEM))
+    }
+
+    @Test
+    fun `system default in the US locale reads the same as the old default pattern`() {
+        // Users with no stored choice moved from the old default pattern to the system default.
+        val sample = Date.from(LocalDateTime.of(2026, 1, 5, 12, 0).toInstant(ZoneOffset.UTC))
+
+        assertEquals(formatDate(sample, DateFormat.DEFAULT, Locale.US), formatDate(sample, DateFormat.SYSTEM, Locale.US))
+    }
 }

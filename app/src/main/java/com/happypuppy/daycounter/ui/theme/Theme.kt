@@ -118,7 +118,7 @@ val AppTypography = Typography(
 @Composable
 fun SimpleDayCounterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dateFormat: DateFormat = DateFormat.DEFAULT,
+    dateFormat: DateFormat = DateFormat.SYSTEM,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

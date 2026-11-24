@@ -436,7 +436,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
 @Composable
 fun DateFormatSetting(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
-    val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
+    val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
     var showFormatOptions by remember { mutableStateOf(false) }
     val sampleDate = remember { Date() }
 

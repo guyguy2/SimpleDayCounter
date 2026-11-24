@@ -85,7 +85,8 @@
     <string name="settings_date_format_select">Select Format</string>
     <string name="settings_date_format_example">Example: %1$s</string>
     <string name="settings_date_format_preview">Preview: %1$s</string>
-    <string name="date_format_default">Default (Dec 31, 2020)</string>
+    <string name="date_format_system">System default</string>
+    <string name="date_format_default">Short (Dec 31, 2020)</string>
     <string name="date_format_us">US (12/31/2020)</string>
     <string name="date_format_eu">EU (31/12/2020)</string>
     <string name="date_format_iso">ISO (2020-12-31)</string>

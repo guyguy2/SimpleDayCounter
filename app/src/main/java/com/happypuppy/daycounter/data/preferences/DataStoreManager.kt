@@ -10,6 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.happypuppy.daycounter.R
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
@@ -39,7 +42,9 @@ enum class AppTheme(val value: String) {
 }
 
 // Add an enum for date format options
-enum class DateFormat(val value: String, val formatPattern: String, @StringRes val displayNameRes: Int) {
+enum class DateFormat(val value: String, val formatPattern: String?, @StringRes val displayNameRes: Int) {
+    // No stored choice: follow the device locale (null pattern, see formatDate).
+    SYSTEM("system", null, R.string.date_format_system),
     DEFAULT("default", "MMM d, yyyy", R.string.date_format_default),
     US("us", "MM/dd/yyyy", R.string.date_format_us),
     EU("eu", "dd/MM/yyyy", R.string.date_format_eu),
@@ -81,8 +86,9 @@ class DataStoreManager(private val context: Context) {
 
     val dateFormatFlow: Flow<DateFormat> = context.dataStore.data
         .map { preferences ->
-            val formatString = preferences[DATE_FORMAT_KEY] ?: DateFormat.DEFAULT.value
-            DateFormat.fromString(formatString)
+            // Nothing stored means the user never chose: follow the device locale. Reading must
+            // never write a choice, and an explicitly stored value (including "default") is kept.
+            preferences[DATE_FORMAT_KEY]?.let { DateFormat.fromString(it) } ?: DateFormat.SYSTEM
         }
 
     suspend fun setDateFormat(format: DateFormat) {
@@ -119,7 +125,14 @@ class DataStoreManager(private val context: Context) {
 
 }
 
-/** Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). */
-fun formatDate(date: Date, format: DateFormat): String {
-    return SimpleDateFormat(format.formatPattern, Locale.getDefault()).format(date)
+/**
+ * Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). [DateFormat.SYSTEM] uses
+ * the locale's own medium date style; every other option is a fixed pattern with locale month names.
+ */
+fun formatDate(date: Date, format: DateFormat, locale: Locale = Locale.getDefault()): String {
+    val pattern = format.formatPattern
+        ?: return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+            .withLocale(locale)
+            .format(date.toInstant().atZone(ZoneId.systemDefault()))
+    return SimpleDateFormat(pattern, locale).format(date)
 }

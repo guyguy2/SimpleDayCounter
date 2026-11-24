@@ -1,11 +1,14 @@
 package com.happypuppy.daycounter.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.data.preferences.AppTheme
+import com.happypuppy.daycounter.data.preferences.DATE_FORMAT_KEY
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
+import com.happypuppy.daycounter.data.preferences.dataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -24,15 +27,17 @@ class DataStoreManagerInstrumentedTest {
 
     private lateinit var manager: DataStoreManager
     private lateinit var savedTheme: AppTheme
-    private lateinit var savedFormat: DateFormat
+    private var savedFormatValue: String? = null
+    private lateinit var context: Context
     private var savedVibrate = true
     private var savedCategories = emptySet<String>()
 
     @Before
     fun setUp() = runBlocking {
-        manager = DataStoreManager(ApplicationProvider.getApplicationContext<Context>())
+        context = ApplicationProvider.getApplicationContext<Context>()
+        manager = DataStoreManager(context)
         savedTheme = manager.themeFlow.first()
-        savedFormat = manager.dateFormatFlow.first()
+        savedFormatValue = context.dataStore.data.first()[DATE_FORMAT_KEY]
         savedVibrate = manager.vibrateEnabledFlow.first()
         savedCategories = manager.customCategoriesFlow.first()
         manager.clearCustomCategories()
@@ -41,7 +46,10 @@ class DataStoreManagerInstrumentedTest {
     @After
     fun tearDown() = runBlocking {
         manager.setTheme(savedTheme)
-        manager.setDateFormat(savedFormat)
+        // Restore the raw stored value, including "nothing stored".
+        context.dataStore.edit { prefs ->
+            savedFormatValue?.let { prefs[DATE_FORMAT_KEY] = it } ?: prefs.remove(DATE_FORMAT_KEY)
+        }
         manager.setVibrateEnabled(savedVibrate)
         manager.clearCustomCategories()
         savedCategories.forEach { manager.addCustomCategory(it) }
@@ -54,6 +62,24 @@ class DataStoreManagerInstrumentedTest {
 
         assertEquals(AppTheme.DARK, manager.themeFlow.first())
         assertEquals(DateFormat.ISO, manager.dateFormatFlow.first())
+    }
+
+    @Test
+    fun noStoredDateFormatMeansTheSystemDefault() = runBlocking {
+        context.dataStore.edit { it.remove(DATE_FORMAT_KEY) }
+
+        assertEquals(DateFormat.SYSTEM, manager.dateFormatFlow.first())
+        // Reading never writes a choice for the user.
+        assertEquals(null, context.dataStore.data.first()[DATE_FORMAT_KEY])
+    }
+
+    @Test
+    fun everyStoredDateFormatIsKept() = runBlocking {
+        // Includes "default": users who picked it before the system option existed keep it.
+        for (format in DateFormat.entries) {
+            context.dataStore.edit { it[DATE_FORMAT_KEY] = format.value }
+            assertEquals(format, manager.dateFormatFlow.first())
+        }
     }
 
     @Test
