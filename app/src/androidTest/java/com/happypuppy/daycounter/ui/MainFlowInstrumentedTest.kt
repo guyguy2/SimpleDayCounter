@@ -45,9 +45,9 @@ import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 /**
- * End-to-end Compose flows against the real app graph (Koin, Room, DataStore). The app starts on
- * a fixed 1500 ms splash, so every test first waits for the main screen. State is reset in
- * [setUp]/[tearDown]; run on an emulator because it clears the app database.
+ * End-to-end Compose flows against the real app graph (Koin, Room, DataStore). Every test first
+ * waits for the main screen. State is reset in [setUp]/[tearDown]; run on an emulator because it
+ * clears the app database.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -59,15 +59,9 @@ class MainFlowInstrumentedTest {
 
     private val koin get() = GlobalContext.get()
 
-    private companion object {
-        const val SPLASH_MS = 2_000L
-    }
-
     @Before
     fun setUp() {
         resetState()
-        // Splash pops itself after a fixed 1500 ms delay that runs on the test (virtual) clock.
-        rule.mainClock.advanceTimeBy(SPLASH_MS)
         rule.waitUntil(timeoutMillis = 15_000) {
             rule.onAllNodes(hasText("Add event"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
