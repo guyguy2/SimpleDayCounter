@@ -1,6 +1,5 @@
 package com.happypuppy.daycounter.ui.theme
 
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import java.io.File
@@ -30,7 +29,7 @@ class SplashColorsTest {
 
     @Test
     fun `light window background equals the Compose light background`() {
-        assertEquals(lightColorScheme().background.toArgb(), resColor("values", "window_background"))
+        assertEquals(LightColorScheme.background.toArgb(), resColor("values", "window_background"))
     }
 
     @Test

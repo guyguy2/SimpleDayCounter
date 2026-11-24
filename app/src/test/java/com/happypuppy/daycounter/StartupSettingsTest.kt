@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -44,6 +45,8 @@ class StartupSettingsTest {
         val startup = StartupSettings()
         val gate = CompletableDeferred<AppSettings>()
         val job = launch { startup.collectFrom(flow { emit(gate.await()) }) }
+        // Let the collector start and suspend on the gate; only then is "not resolved" meaningful.
+        yield()
 
         assertFalse(startup.isResolved)
         assertNull(startup.settings.value)
