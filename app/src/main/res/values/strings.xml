@@ -10,4 +10,9 @@
         <item quantity="one">day past</item>
         <item quantity="other">days past</item>
     </plurals>
+    <string name="main_error_load_failed">Failed to load events</string>
+    <string name="main_error_save_failed">Failed to save event</string>
+    <string name="main_error_update_failed">Failed to update event</string>
+    <string name="main_error_delete_failed">Failed to delete event</string>
+    <string name="main_error_restore_failed">Failed to restore event</string>
 </resources>

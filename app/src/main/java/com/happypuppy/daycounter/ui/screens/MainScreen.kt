@@ -470,7 +470,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Error banner if any database operation failed
-                uiState.error?.let { errorMessage ->
+                uiState.error?.let { error ->
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -483,7 +483,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = errorMessage,
+                                text = error.message.asString(),
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f)
