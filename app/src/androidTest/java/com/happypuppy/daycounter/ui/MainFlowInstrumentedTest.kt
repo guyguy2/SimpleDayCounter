@@ -7,6 +7,9 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
@@ -77,6 +80,7 @@ class MainFlowInstrumentedTest {
         val store = koin.get<DataStoreManager>()
         store.clearCustomCategories()
         store.setTheme(AppTheme.SYSTEM_DEFAULT)
+        store.setDynamicColor(false)
     }
 
     /**
@@ -397,6 +401,23 @@ class MainFlowInstrumentedTest {
             runBlocking(Dispatchers.IO) { koin.get<DataStoreManager>().themeFlow.first() } == AppTheme.DARK
         }
         rule.onNode(hasText("Dark") and isSelectable()).assertIsSelected()
+    }
+
+    @Test
+    fun dynamicColorSwitchIsOffByDefaultAndPersistsWhenTurnedOn() {
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Dynamic color"), timeoutMillis = 5_000)
+
+        val toggle = hasText("Dynamic color") and isToggleable()
+        rule.onNode(toggle).assertIsOff()
+        runBlocking(Dispatchers.IO) { assertEquals(false, koin.get<DataStoreManager>().dynamicColorFlow.first()) }
+
+        rule.onNode(toggle).performClick()
+
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) { koin.get<DataStoreManager>().dynamicColorFlow.first() }
+        }
+        rule.onNode(toggle).assertIsOn()
     }
 
     @Test

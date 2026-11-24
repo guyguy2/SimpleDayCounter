@@ -34,6 +34,7 @@ val THEME_KEY = stringPreferencesKey("app_theme")
 val VIBRATE_KEY = booleanPreferencesKey("vibrate_enabled")
 val DATE_FORMAT_KEY = stringPreferencesKey("date_format")
 val CUSTOM_CATEGORIES_KEY = stringSetPreferencesKey("custom_categories")
+val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
 
 // Theme options
 enum class AppTheme(val value: String) {
@@ -73,7 +74,11 @@ enum class DateFormat(val value: String, val formatPattern: String?, @StringRes 
 }
 
 /** The settings that decide the first frame: resolved once, never a placeholder. */
-data class AppSettings(val theme: AppTheme, val dateFormat: DateFormat) {
+data class AppSettings(
+    val theme: AppTheme,
+    val dateFormat: DateFormat,
+    val dynamicColor: Boolean = false
+) {
     companion object {
         val Defaults = AppSettings(AppTheme.SYSTEM_DEFAULT, DateFormat.SYSTEM)
     }
@@ -88,6 +93,9 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
     private fun dateFormatOf(preferences: Preferences): DateFormat =
         preferences[DATE_FORMAT_KEY]?.let { DateFormat.fromString(it) } ?: DateFormat.SYSTEM
 
+    // Brand palette unless the user turned dynamic color on: nothing stored means off.
+    private fun dynamicColorOf(preferences: Preferences): Boolean = preferences[DYNAMIC_COLOR_KEY] == true
+
     // A failed read (including a corrupt file) resolves to the defaults instead of failing the
     // collector, so the splash keep condition and the first frame can never wait on a dead flow.
     // Anything that is not an IOException is a bug and still propagates.
@@ -96,7 +104,7 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
     }
 
     val settingsFlow: Flow<AppSettings> = data
-        .map { AppSettings(themeOf(it), dateFormatOf(it)) }
+        .map { AppSettings(themeOf(it), dateFormatOf(it), dynamicColorOf(it)) }
         .distinctUntilChanged()
 
     // Theme preference
@@ -105,6 +113,14 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
     suspend fun setTheme(theme: AppTheme) {
         dataStore.edit { settings ->
             settings[THEME_KEY] = theme.value
+        }
+    }
+
+    val dynamicColorFlow: Flow<Boolean> = data.map(::dynamicColorOf)
+
+    suspend fun setDynamicColor(enabled: Boolean) {
+        dataStore.edit { settings ->
+            settings[DYNAMIC_COLOR_KEY] = enabled
         }
     }
 

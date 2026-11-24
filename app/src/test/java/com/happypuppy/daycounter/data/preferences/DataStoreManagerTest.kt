@@ -251,4 +251,56 @@ class DataStoreManagerTest {
         assertEquals(AppSettings.Defaults, newManager().settingsFlow.first())
         assertEquals(AppSettings(AppTheme.SYSTEM_DEFAULT, DateFormat.SYSTEM), AppSettings.Defaults)
     }
+
+    // Dynamic color (UX-10): an additive boolean, off unless the user turns it on
+
+    @Test
+    fun `dynamic color is off by default`() = runBlocking {
+        val manager = newManager()
+
+        assertFalse(manager.dynamicColorFlow.first())
+        assertFalse(manager.settingsFlow.first().dynamicColor)
+        assertFalse(AppSettings.Defaults.dynamicColor)
+    }
+
+    @Test
+    fun `dynamic color round trips and reaches settingsFlow`() = runBlocking {
+        val manager = newManager()
+
+        manager.setDynamicColor(true)
+        assertTrue(manager.dynamicColorFlow.first())
+        assertEquals(AppSettings(AppTheme.SYSTEM_DEFAULT, DateFormat.SYSTEM, dynamicColor = true), manager.settingsFlow.first())
+
+        manager.setDynamicColor(false)
+        assertFalse(manager.dynamicColorFlow.first())
+    }
+
+    @Test
+    fun `dynamic color key is additive and touches nothing else`() = runBlocking {
+        assertEquals("dynamic_color", DYNAMIC_COLOR_KEY.name)
+        val (store, _) = openStore()
+        val manager = DataStoreManager(store)
+        manager.setTheme(AppTheme.DARK)
+        manager.setDateFormat(DateFormat.EU)
+        val before = store.data.first().asMap().filterKeys { it.name != "dynamic_color" }
+
+        manager.setDynamicColor(true)
+
+        val after = store.data.first().asMap()
+        assertEquals(before, after.filterKeys { it.name != "dynamic_color" })
+        assertEquals(true, after[booleanPreferencesKey("dynamic_color")])
+        assertEquals(AppTheme.DARK, manager.themeFlow.first())
+        assertEquals(DateFormat.EU, manager.dateFormatFlow.first())
+    }
+
+    @Test
+    fun `an existing settings file without the key reads dynamic color as off`() = runBlocking {
+        val (store, _) = openStore()
+        store.edit {
+            it[stringPreferencesKey("app_theme")] = "dark"
+            it[stringPreferencesKey("date_format")] = "iso"
+        }
+
+        assertEquals(AppSettings(AppTheme.DARK, DateFormat.ISO, dynamicColor = false), DataStoreManager(store).settingsFlow.first())
+    }
 }

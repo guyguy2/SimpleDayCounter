@@ -61,7 +61,8 @@ class MainActivity : ComponentActivity() {
 
             SimpleDayCounterTheme(
                 darkTheme = useDarkTheme,
-                dateFormat = resolved.dateFormat
+                dateFormat = resolved.dateFormat,
+                dynamicColor = resolved.dynamicColor
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

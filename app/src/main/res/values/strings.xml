@@ -70,6 +70,8 @@
     <string name="settings_theme_system">System Default</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_description">Use colors from your wallpaper</string>
     <string name="settings_vibration">Vibration</string>
     <string name="settings_vibration_description">Vibrate when deleting an event</string>
     <string name="settings_rate_app">Rate App</string>

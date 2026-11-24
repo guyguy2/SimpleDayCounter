@@ -1,6 +1,7 @@
 package com.happypuppy.daycounter.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import com.happypuppy.daycounter.util.isColorBright
 import org.junit.After
@@ -70,6 +71,34 @@ class EventCardColorsTest {
                 val badge = CategoryColors.getCategoryColor(category, dark)
                 val ratio = Wcag.contrast(badgeText(badge), badge)
                 assertTrue("dark=$dark $category badge digits $ratio", ratio >= 3.0)
+            }
+        }
+    }
+
+    // Dynamic color: the wallpaper scheme is unknown on the JVM, so the mapping is checked on
+    // both brand schemes, and the pairs it relies on are tonal pairs in any Material 3 scheme.
+
+    @Test
+    fun `dynamic card colors map to the tertiary primary and secondary containers`() {
+        for (scheme in listOf(LightColorScheme, DarkColorScheme)) {
+            val colors = dynamicEventCardColors(scheme)
+            assertEquals(scheme.tertiaryContainer, colors.past.container)
+            assertEquals(scheme.onTertiaryContainer, colors.past.content)
+            assertEquals(scheme.primaryContainer, colors.today.container)
+            assertEquals(scheme.onPrimaryContainer, colors.today.content)
+            assertEquals(scheme.secondaryContainer, colors.future.container)
+            assertEquals(scheme.onSecondaryContainer, colors.future.content)
+        }
+    }
+
+    @Test
+    fun `text on dynamic containers reaches 4_5 to 1 including the secondary alpha`() {
+        for ((name, scheme) in listOf("light" to LightColorScheme, "dark" to DarkColorScheme)) {
+            for ((state, c) in states(dynamicEventCardColors(scheme))) {
+                val primary = Wcag.contrast(c.content, c.container)
+                val secondary = Wcag.contrast(c.contentVariant.compositeOver(c.container), c.container)
+                assertTrue("$name $state primary $primary", primary >= 4.5)
+                assertTrue("$name $state secondary $secondary", secondary >= 4.5)
             }
         }
     }

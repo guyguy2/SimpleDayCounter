@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Today
@@ -107,6 +108,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
             SettingsSectionHeader(stringResource(R.string.settings_section_appearance))
 
             ThemeSelector(dataStoreManager)
+
+            DynamicColorSetting(dataStoreManager)
 
             HorizontalDivider()
 
@@ -267,6 +270,20 @@ fun ThemeOption(
 
         Text(title, modifier = Modifier.weight(1f))
     }
+}
+
+@Composable
+fun DynamicColorSetting(dataStoreManager: DataStoreManager) {
+    val scope = rememberCoroutineScope()
+    val isEnabled by dataStoreManager.dynamicColorFlow.collectAsState(initial = false)
+
+    SettingSwitch(
+        title = stringResource(R.string.settings_dynamic_color),
+        description = stringResource(R.string.settings_dynamic_color_description),
+        checked = isEnabled,
+        icon = Icons.Outlined.Palette,
+        onCheckedChange = { enabled -> scope.launch { dataStoreManager.setDynamicColor(enabled) } }
+    )
 }
 
 @Composable

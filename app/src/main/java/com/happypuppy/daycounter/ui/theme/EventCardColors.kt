@@ -48,3 +48,21 @@ fun brandEventCardColors(scheme: ColorScheme, darkTheme: Boolean): EventCardColo
         EventCardColors(state(LightCardPink), state(LightCardPurple), state(LightCardYellow))
     }
 }
+
+/**
+ * Dynamic color: past, today and future map to the tertiary, primary and secondary containers of
+ * the wallpaper scheme, with text from the matching on-container roles. Those pairs are tonal by
+ * design (container tone 90 or 30 against on-container tone 10 or 90), so no brand tints are used.
+ */
+fun dynamicEventCardColors(scheme: ColorScheme): EventCardColors {
+    fun state(container: Color, onContainer: Color) =
+        EventStateColors(container, onContainer, onContainer.copy(alpha = DYNAMIC_VARIANT_ALPHA))
+    return EventCardColors(
+        past = state(scheme.tertiaryContainer, scheme.onTertiaryContainer),
+        today = state(scheme.primaryContainer, scheme.onPrimaryContainer),
+        future = state(scheme.secondaryContainer, scheme.onSecondaryContainer)
+    )
+}
+
+/** Secondary text (date, category) is the on-container color at this alpha. */
+const val DYNAMIC_VARIANT_ALPHA = 0.8f
