@@ -3,16 +3,18 @@ package com.happypuppy.daycounter.data.preferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * The persisted `value` strings are an on-disk contract (DataStore + cloud backup), so they must be
- * unique and round-trip. DateFormat.displayName is hardcoded English text with an embedded example;
- * this test keeps those examples honest until they are replaced by string resources.
+ * unique and round-trip. The date format display names are string resources with an embedded
+ * example; this test keeps those examples honest.
  */
 class PreferenceEnumsTest {
 
@@ -36,21 +38,39 @@ class PreferenceEnumsTest {
     }
 
     @Test
-    fun `displayName examples match what formatDate produces for 31 Dec 2020 in US locale`() {
+    fun `display name examples match what formatDate produces for 31 Dec 2020 in US locale`() {
         val originalLocale = Locale.getDefault()
         val originalZone = TimeZone.getDefault()
         try {
             Locale.setDefault(Locale.US)
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             val sample = Date.from(LocalDateTime.of(2020, 12, 31, 12, 0).atZone(ZoneId.of("UTC")).toInstant())
+            val names = dateFormatDisplayNames()
             for (format in DateFormat.entries) {
-                val example = format.displayName.substringAfter('(').substringBefore(')')
-                assertEquals("example in '${format.displayName}'", example, formatDate(sample, format))
+                // Convention: the display name of format "iso" is the string resource date_format_iso.
+                val displayName = names.getValue("date_format_${format.value}")
+                val example = displayName.substringAfter('(').substringBefore(')')
+                assertEquals("example in '$displayName'", example, formatDate(sample, format))
             }
         } finally {
             Locale.setDefault(originalLocale)
             TimeZone.setDefault(originalZone)
         }
+    }
+
+    @Test
+    fun `every date format has its own display name resource`() {
+        assertEquals(DateFormat.entries.size, DateFormat.entries.map { it.displayNameRes }.toSet().size)
+    }
+
+    /** Reads the English display names straight from strings.xml (the JVM has no Android resources). */
+    private fun dateFormatDisplayNames(): Map<String, String> {
+        val file = File("src/main/res/values/strings.xml")
+        val nodes = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
+            .getElementsByTagName("string")
+        return (0 until nodes.length).map { nodes.item(it) }
+            .associate { it.attributes.getNamedItem("name").nodeValue to it.textContent }
+            .filterKeys { it.startsWith("date_format_") }
     }
 
     @Test

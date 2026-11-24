@@ -1,6 +1,7 @@
 package com.happypuppy.daycounter.data.preferences
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -8,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.happypuppy.daycounter.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
@@ -37,12 +39,12 @@ enum class AppTheme(val value: String) {
 }
 
 // Add an enum for date format options
-enum class DateFormat(val value: String, val formatPattern: String, val displayName: String) {
-    DEFAULT("default", "MMM d, yyyy", "Default (Dec 31, 2020)"),
-    US("us", "MM/dd/yyyy", "US (12/31/2020)"),
-    EU("eu", "dd/MM/yyyy", "EU (31/12/2020)"),
-    ISO("iso", "yyyy-MM-dd", "ISO (2020-12-31)"),
-    FULL("full", "MMMM d, yyyy", "Full (December 31, 2020)");
+enum class DateFormat(val value: String, val formatPattern: String, @StringRes val displayNameRes: Int) {
+    DEFAULT("default", "MMM d, yyyy", R.string.date_format_default),
+    US("us", "MM/dd/yyyy", R.string.date_format_us),
+    EU("eu", "dd/MM/yyyy", R.string.date_format_eu),
+    ISO("iso", "yyyy-MM-dd", R.string.date_format_iso),
+    FULL("full", "MMMM d, yyyy", R.string.date_format_full);
 
     companion object {
         fun fromString(value: String): DateFormat {
