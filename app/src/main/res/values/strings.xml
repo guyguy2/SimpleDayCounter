@@ -90,4 +90,17 @@
     <string name="date_format_eu">EU (31/12/2020)</string>
     <string name="date_format_iso">ISO (2020-12-31)</string>
     <string name="date_format_full">Full (December 31, 2020)</string>
+    <string name="category_mgmt_title">Manage Categories</string>
+    <string name="category_mgmt_default_header">Default Categories</string>
+    <string name="category_mgmt_custom_header">Custom Categories</string>
+    <string name="category_mgmt_delete_all_cd">Delete All Categories</string>
+    <string name="category_mgmt_add_cd">Add Custom Category</string>
+    <string name="category_mgmt_empty_landscape">No custom categories yet.\nAdd one using the + button.</string>
+    <string name="category_mgmt_empty_portrait">No custom categories yet. Add one using the + button.</string>
+    <string name="category_mgmt_delete_title">Delete Category</string>
+    <string name="category_mgmt_delete_message">Are you sure you want to delete \"%1$s\"?</string>
+    <string name="category_mgmt_delete_all_title">Delete All Custom Categories</string>
+    <string name="category_mgmt_delete_all_message">Are you sure you want to delete all custom categories? This action cannot be undone.</string>
+    <string name="category_mgmt_delete_all_confirm">Delete All</string>
+    <string name="category_mgmt_delete_cd">Delete Category</string>
 </resources>

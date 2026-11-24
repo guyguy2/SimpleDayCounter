@@ -46,9 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddCategoryInput
 import com.happypuppy.daycounter.ui.components.CategoryColorIndicator
@@ -87,10 +89,10 @@ fun CategoryManagementScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Manage Categories") },
+                title = { Text(stringResource(R.string.category_mgmt_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -112,7 +114,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         .padding(end = 8.dp)
                 ) {
                     Text(
-                        text = "Default Categories",
+                        text = stringResource(R.string.category_mgmt_default_header),
                         style = MaterialTheme.typography.titleMedium
                     )
 
@@ -149,7 +151,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Custom Categories",
+                            text = stringResource(R.string.category_mgmt_custom_header),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f)
                         )
@@ -158,7 +160,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             IconButton(onClick = { showDeleteAllConfirmation = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete All Categories",
+                                    contentDescription = stringResource(R.string.category_mgmt_delete_all_cd),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -167,7 +169,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         IconButton(onClick = { showAddCategoryInput = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Add Custom Category"
+                                contentDescription = stringResource(R.string.category_mgmt_add_cd)
                             )
                         }
                     }
@@ -177,7 +179,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             dataStoreManager = dataStoreManager,
                             onCategoryAdded = { showAddCategoryInput = false },
                             onCancel = { showAddCategoryInput = false },
-                            placeholder = "Enter a new category name"
+                            placeholder = stringResource(R.string.category_name_placeholder)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -191,7 +193,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No custom categories yet.\nAdd one using the + button.",
+                                text = stringResource(R.string.category_mgmt_empty_landscape),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -236,7 +238,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             dataStoreManager = dataStoreManager,
                             onCategoryAdded = { showAddCategoryInput = false },
                             onCancel = { showAddCategoryInput = false },
-                            placeholder = "Enter a new category name"
+                            placeholder = stringResource(R.string.category_name_placeholder)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -244,7 +246,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
 
                 item(key = "default_header") {
                     Text(
-                        text = "Default Categories",
+                        text = stringResource(R.string.category_mgmt_default_header),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -270,7 +272,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Custom Categories",
+                            text = stringResource(R.string.category_mgmt_custom_header),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f)
                         )
@@ -279,7 +281,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                             IconButton(onClick = { showDeleteAllConfirmation = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete All Categories",
+                                    contentDescription = stringResource(R.string.category_mgmt_delete_all_cd),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -288,7 +290,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         IconButton(onClick = { showAddCategoryInput = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Add Custom Category"
+                                contentDescription = stringResource(R.string.category_mgmt_add_cd)
                             )
                         }
                     }
@@ -298,7 +300,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
                 if (sortedCustomCategories.isEmpty()) {
                     item(key = "custom_empty") {
                         Text(
-                            text = "No custom categories yet. Add one using the + button.",
+                            text = stringResource(R.string.category_mgmt_empty_portrait),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -320,8 +322,8 @@ fun CategoryManagementScreen(navController: NavHostController) {
     categoryToDelete?.let { category ->
         AlertDialog(
             onDismissRequest = { categoryToDelete = null },
-            title = { Text("Delete Category") },
-            text = { Text("Are you sure you want to delete \"$category\"?") },
+            title = { Text(stringResource(R.string.category_mgmt_delete_title)) },
+            text = { Text(stringResource(R.string.category_mgmt_delete_message, category)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -331,12 +333,12 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         categoryToDelete = null
                     }
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.common_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { categoryToDelete = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -346,8 +348,8 @@ fun CategoryManagementScreen(navController: NavHostController) {
     if (showDeleteAllConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteAllConfirmation = false },
-            title = { Text("Delete All Custom Categories") },
-            text = { Text("Are you sure you want to delete all custom categories? This action cannot be undone.") },
+            title = { Text(stringResource(R.string.category_mgmt_delete_all_title)) },
+            text = { Text(stringResource(R.string.category_mgmt_delete_all_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -357,12 +359,12 @@ fun CategoryManagementScreen(navController: NavHostController) {
                         showDeleteAllConfirmation = false
                     }
                 ) {
-                    Text("Delete All", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.category_mgmt_delete_all_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteAllConfirmation = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -401,7 +403,7 @@ private fun CategoryItem(
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Category"
+                        contentDescription = stringResource(R.string.category_mgmt_delete_cd)
                     )
                 }
             }
