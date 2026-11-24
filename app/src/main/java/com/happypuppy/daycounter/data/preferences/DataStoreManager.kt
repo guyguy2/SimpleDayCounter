@@ -41,6 +41,13 @@ enum class AppTheme(val value: String) {
     LIGHT("light"),
     DARK("dark");
 
+    /** Whether this choice renders dark, given whether the device is currently in dark mode. */
+    fun isDark(systemDark: Boolean): Boolean = when (this) {
+        SYSTEM_DEFAULT -> systemDark
+        LIGHT -> false
+        DARK -> true
+    }
+
     companion object {
         fun fromString(value: String): AppTheme {
             return entries.find { it.value == value } ?: SYSTEM_DEFAULT

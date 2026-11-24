@@ -34,11 +34,7 @@ class MainActivity : ComponentActivity() {
             val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
             val isSystemInDarkTheme = isSystemInDarkTheme()
 
-            val useDarkTheme = when (themePreference) {
-                AppTheme.SYSTEM_DEFAULT -> isSystemInDarkTheme
-                AppTheme.LIGHT -> false
-                AppTheme.DARK -> true
-            }
+            val useDarkTheme = themePreference.isDark(isSystemInDarkTheme)
 
             DisposableEffect(useDarkTheme) {
                 enableEdgeToEdge(
