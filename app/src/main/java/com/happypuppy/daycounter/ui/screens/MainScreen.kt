@@ -79,12 +79,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.FilterChip
@@ -132,7 +130,11 @@ private const val FILTER_CATEGORY_KEY = "category"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koinViewModel()) {
+fun MainScreen(
+    onOpenSettings: () -> Unit,
+    onOpenCategories: () -> Unit,
+    viewModel: EventViewModel = koinViewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val addSheetState = rememberBottomSheetState(
@@ -431,7 +433,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         }
                     }
 
-                    IconButton(onClick = { navController.navigate(Screen.Settings) }) {
+                    IconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = stringResource(R.string.main_settings)
@@ -607,7 +609,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             )
                             showAddEventSheet = false
                         },
-                        navController = navController
+                        onOpenCategories = onOpenCategories
                     )
                 }
             }
@@ -629,7 +631,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             viewModel.deleteItem(item)
                             showEditEventSheet = false
                         },
-                        navController = navController
+                        onOpenCategories = onOpenCategories
                     )
                 }
             }

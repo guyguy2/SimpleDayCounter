@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
@@ -63,7 +62,7 @@ import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoryManagementScreen(navController: NavHostController) {
+fun CategoryManagementScreen(onBack: () -> Unit) {
     val dataStoreManager = koinInject<DataStoreManager>()
     val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
     val sortedCustomCategories = remember(customCategories) {
@@ -92,7 +91,7 @@ fun CategoryManagementScreen(navController: NavHostController) {
             TopAppBar(
                 title = { Text(stringResource(R.string.category_mgmt_title)) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }

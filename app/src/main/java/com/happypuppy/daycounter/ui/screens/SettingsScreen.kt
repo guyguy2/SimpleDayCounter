@@ -67,13 +67,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.navigation.NavHostController
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.data.preferences.formatDate
-import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.util.AppVersionInfo
 import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.launch
@@ -82,7 +80,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavHostController) {
+fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
     val dataStoreManager = koinInject<DataStoreManager>()
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -91,7 +89,7 @@ fun SettingsScreen(navController: NavHostController) {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
@@ -126,7 +124,7 @@ fun SettingsScreen(navController: NavHostController) {
 
             SettingsSectionHeader(stringResource(R.string.settings_section_categories))
 
-            CategoryManagementSetting(navController)
+            CategoryManagementSetting(onOpenCategories)
 
             HorizontalDivider()
 
@@ -155,11 +153,11 @@ private fun SettingsSectionHeader(title: String) {
 }
 
 @Composable
-fun CategoryManagementSetting(navController: NavHostController) {
+fun CategoryManagementSetting(onOpenCategories: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { navController.navigate(Screen.CategoryManagement) }
+            .clickable { onOpenCategories() }
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

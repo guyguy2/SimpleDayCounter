@@ -104,7 +104,10 @@ fun AppNavigation() {
                 )
             }
         ) {
-            MainScreen(navController = navController)
+            MainScreen(
+                onOpenSettings = { navController.navigate(Screen.Settings) },
+                onOpenCategories = { navController.navigate(Screen.CategoryManagement) }
+            )
         }
 
         composable<Screen.Settings>(
@@ -133,7 +136,10 @@ fun AppNavigation() {
                 )
             }
         ) {
-            SettingsScreen(navController = navController)
+            SettingsScreen(
+                onBack = { navController.navigateUp() },
+                onOpenCategories = { navController.navigate(Screen.CategoryManagement) }
+            )
         }
 
         composable<Screen.CategoryManagement>(
@@ -162,7 +168,7 @@ fun AppNavigation() {
                 )
             }
         ) {
-            CategoryManagementScreen(navController = navController)
+            CategoryManagementScreen(onBack = { navController.navigateUp() })
         }
     }
 }

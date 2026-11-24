@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
@@ -62,7 +61,7 @@ fun EditEventScreen(
     dataStoreManager: DataStoreManager,
     onSave: (Item) -> Unit,
     onDelete: (Item) -> Unit,
-    navController: NavController? = null
+    onOpenCategories: () -> Unit = {}
 ) {
     val dateFormat = LocalDateFormat.current
 
@@ -160,13 +159,13 @@ fun EditEventScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Shared CategorySelector component with NavController
+        // Shared CategorySelector component
         CategorySelector(
             selectedCategory = selectedCategory,
             onCategorySelected = { category -> selectedCategory = category },
             dataStoreManager = dataStoreManager,
             modifier = Modifier.fillMaxWidth(),
-            navController = navController
+            onOpenCategories = onOpenCategories
         )
 
         Spacer(modifier = Modifier.height(32.dp))

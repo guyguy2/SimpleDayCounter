@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
@@ -61,7 +60,7 @@ fun AddEventBottomSheet(
     dataStoreManager: DataStoreManager,
     onDismiss: () -> Unit,
     onSave: (name: String, targetDate: Date, category: String, emoji: String) -> Unit,
-    navController: NavController? = null
+    onOpenCategories: () -> Unit = {}
 ) {
     val dateFormat = LocalDateFormat.current
 
@@ -159,13 +158,13 @@ fun AddEventBottomSheet(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Use the shared CategorySelector component with NavController
+        // Use the shared CategorySelector component
         CategorySelector(
             selectedCategory = selectedCategory,
             onCategorySelected = { category -> selectedCategory = category },
             dataStoreManager = dataStoreManager,
             modifier = Modifier.fillMaxWidth(),
-            navController = navController
+            onOpenCategories = onOpenCategories
         )
 
         Spacer(modifier = Modifier.height(32.dp))

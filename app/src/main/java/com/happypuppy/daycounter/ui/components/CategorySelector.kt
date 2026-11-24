@@ -20,10 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 
@@ -40,7 +38,7 @@ fun CategorySelector(
     onCategorySelected: (String) -> Unit,
     dataStoreManager: DataStoreManager,
     modifier: Modifier = Modifier,
-    navController: NavController? = null,
+    onOpenCategories: () -> Unit = {},
 ) {
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
@@ -105,7 +103,7 @@ fun CategorySelector(
                         onClick = {
                             if (category == ADD_CUSTOM_CATEGORY_KEY) {
                                 // Navigate to the Category Management screen instead of showing input
-                                navController?.navigate(Screen.CategoryManagement)
+                                onOpenCategories()
                             } else {
                                 onCategorySelected(category)
                             }
