@@ -186,7 +186,8 @@ fun SimpleDayCounterTheme(
 
     CompositionLocalProvider(
         LocalIsDarkTheme provides darkTheme,
-        LocalDateFormat provides dateFormat
+        LocalDateFormat provides dateFormat,
+        LocalEventCardColors provides brandEventCardColors(colorScheme, darkTheme)
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
