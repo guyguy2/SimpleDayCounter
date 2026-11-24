@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
@@ -91,7 +93,7 @@ fun EditEventScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Edit Event",
+            text = stringResource(R.string.edit_event_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -102,7 +104,7 @@ fun EditEventScreen(
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Event Name") },
+            label = { Text(stringResource(R.string.form_event_name)) },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words
@@ -119,8 +121,8 @@ fun EditEventScreen(
                     emoji = newValue
                 }
             },
-            label = { Text("Optional Emoji") },
-            placeholder = { Text("Enter an emoji character") },
+            label = { Text(stringResource(R.string.form_optional_emoji)) },
+            placeholder = { Text(stringResource(R.string.form_emoji_placeholder)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -130,17 +132,18 @@ fun EditEventScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val selectDateAction = stringResource(R.string.form_select_date_action)
         // Target date field: the read-only field itself is the single focus target and acts as a
         // button that opens the date picker (no overlay).
         OutlinedTextField(
             value = formatDate(targetDate, dateFormat),
             onValueChange = { /* readonly */ },
-            label = { Text("Target Date") },
+            label = { Text(stringResource(R.string.form_target_date)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics {
                     role = Role.Button
-                    onClick(label = "Select date") {
+                    onClick(label = selectDateAction) {
                         showDatePicker = true
                         true
                     }
@@ -148,7 +151,7 @@ fun EditEventScreen(
             trailingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.CalendarMonth,
-                    contentDescription = "Select Date"
+                    contentDescription = stringResource(R.string.form_select_date)
                 )
             },
             readOnly = true,
@@ -177,7 +180,7 @@ fun EditEventScreen(
                 onClick = { onDelete(item) },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Delete")
+                Text(stringResource(R.string.common_delete))
             }
 
             Spacer(modifier = Modifier.weight(0.5f))
@@ -197,7 +200,7 @@ fun EditEventScreen(
                 enabled = name.isNotBlank(),
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Save")
+                Text(stringResource(R.string.edit_event_save))
             }
         }
     }
@@ -217,12 +220,12 @@ fun EditEventScreen(
                     }
                     showDatePicker = false
                 }) {
-                    Text("Confirm")
+                    Text(stringResource(R.string.common_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         ) {

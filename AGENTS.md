@@ -28,6 +28,16 @@ adb -s emulator-5554 shell am instrument -w -r com.happypuppy.daycounter.test/an
 
 When two emulators share one AVD, start every instance with `-read-only`.
 
+Pseudolocales (debug builds only, `isPseudoLocalesEnabled` in `app/build.gradle.kts`; the release APK lists neither): `en-XA` expands and accents the text, `ar-XB` mirrors it for RTL. Switch the app to one with the per-app locale command, restart it, and reset the list when done:
+
+```bash
+adb -s emulator-5554 shell cmd locale set-app-locales com.happypuppy.daycounter --locales en-XA   # or ar-XB
+adb -s emulator-5554 shell am force-stop com.happypuppy.daycounter
+adb -s emulator-5554 shell cmd locale set-app-locales com.happypuppy.daycounter                   # reset to the device locale
+```
+
+The setting survives `install -r` and the instrumented tests assert English text, so always reset it before running them. The system language picker did not offer the pseudolocales on the emulator image used here, and `persist.sys.locale` cannot be set without root; the per-app command above worked without `android:localeConfig`.
+
 CI (`.github/workflows/ci.yml`) runs on JDK 21 (Temurin). The Gradle daemon JVM is pinned to 21 in `gradle/gradle-daemon-jvm.properties` (written by `./gradlew updateDaemonJvm --jvm-version=21`, provisioned through the foojay toolchain resolver in `settings.gradle.kts`), and `app/build.gradle.kts` runs the unit tests on a JDK 21 launcher. The first run may download JDK 21.
 
 The pin matters because `IsSingleGraphemeTest` needs `BreakIterator` grapheme-cluster rules from JDK 20 or later. It affects only the Gradle daemon and the test JVM: sources and bytecode still compile for JDK 17.
@@ -47,13 +57,19 @@ Use the `android` CLI as needed for Android workflows (`android --help` / `andro
   - `deleteItem` updates UI state immediately (snackbar + `lastDeletedItem`), then commits to Room after `DELETE_DELAY_MS` (200 ms) so the swipe-out animation finishes; the delayed job is tracked in `pendingDeleteJobs` and cancelled by `undoDelete`. `restoredItemKeys` (id to monotonic token) re-keys the `LazyColumn` row after undo so swipe state resets, and auto-expires after `RESTORATION_KEY_TTL_MS` (300 ms). Tests using `advanceUntilIdle()` drain these timers; existing tests use `runCurrent()` to inspect intermediate state.
 - **Persistence & backup**:
   - Room: a single `items` table (`app_database`). `Item`, `ItemDao`, `AppDatabase`, and `ItemRepository` all live in `data/database/Database.kt`. `DateConverters` lives separately in `data/repository/DateConverters.kt`.
-  - DataStore (`data/preferences/DataStoreManager.kt`, file `settings`): theme, vibrate (default on), date format, custom categories (`Set<String>`). `formatDate(date, format)` is a top-level pure function in the same file, not a method.
+  - DataStore (`data/preferences/DataStoreManager.kt`, file `settings`): theme, vibrate (default on), date format, custom categories (`Set<String>`). `formatDate(date, format, locale)` is a top-level pure function in the same file, not a method.
+  - Date format default: nothing stored means `DateFormat.SYSTEM` (value `system`), which formats with the device locale (`DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)`). Only a tap on a Settings menu item writes the key; reading never does. Stored `default`, `us`, `eu`, `iso` and `full` are kept. The value strings are frozen (`PreferenceEnumsTest`); `system` was added in front. The old `default` option (`MMM d, yyyy`) is labelled "Short" in the UI.
   - `res/xml/data_extraction_rules.xml` explicitly includes `database/app_database` and `file/datastore/settings.preferences_pb` for cloud backup and device transfer — update it if either persistence filename changes.
 - **Theme, categories & UI models**:
   - `SimpleDayCounterTheme` (`ui/theme/Theme.kt`) resolves dark mode and date format once (collected in `MainActivity`) and provides them via `LocalIsDarkTheme` / `LocalDateFormat`. Leaf composables such as `EventCard` and `CategorySelector` read these locals instead of collecting DataStore flows; they throw if rendered outside the theme.
   - `MainActivity` declares `android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"` in `AndroidManifest.xml`, so rotation, resize, and dark-mode switches do not recreate the Activity.
   - `SortOption`, `FilterOption`, `FilterState`, `FilterStateSaver`, and `filterItems` are defined in `ui/screens/MainScreen.kt`, and `defaultCategories` in `ui/components/CategorySelector.kt` — look there rather than a dedicated model package.
   - Category validation (`normalizeCategoryName`, `isDuplicateCategory`) lives in `ui/components/AddCategoryInput.kt`; `CategoryColors` (`ui/theme/CategoryColors.kt`) assigns fixed light/dark colors to default categories and deterministic HSL colors (from `hashCode()`) to custom categories.
+- **Text and strings**:
+  - All UI text lives in `res/values/strings.xml` (English only, no `localeConfig`). Names are snake_case with a screen prefix (`main_`, `settings_`, `category_mgmt_`, `form_`, `filter_`, `event_card_`, ...) and `common_` for words shared across screens. Counts use `<plurals>` (`event_card_days_left`, `event_card_days_past`); the badge number itself stays `abs(daysLeft).toString()` on purpose so digits are not localized by accident. Typographic characters are written as XML entities (`&#8230;`, `&#169;`) so source files stay ASCII; do not use a spaced hyphen between digits or three dots in a string (lint `TypographyDashes` and `TypographyEllipsis` fire). `date_format_iso` ("ISO (2020-12-31)") is the one exception, see Known gaps.
+  - `UiText` (`util/UiText.kt`) carries text out of non-UI code: `DynamicString`, `StringResource(id, args)`, `PluralResource(id, count, args)`, resolved with `asString()` (composable) or `asString(context)`. `EventError` (`ui/screens/EventError.kt`) is the sealed failure type of `EventViewModel` (load, save, update, delete, restore); `MainScreenUiState.error` holds it and the banner shows `error.message.asString()`. The ViewModel never surfaces exception messages.
+  - Default categories keep their English strings as stored keys (colors, icons and saved events match on them). Display goes through `categoryDisplayName(key)` (`ui/components/CategoryNames.kt`), which maps the four defaults to `category_*` resources and shows custom categories as stored. The "Add Custom..." menu sentinel is the private key `ADD_CUSTOM_CATEGORY_KEY`; its visible text is `category_add_custom`.
+  - Literal guard: `StringLiteralGuardTest` scans `app/src/main/java` and fails on a string literal with a letter in `Text("...")`, `text|title|description|placeholder|message|actionLabel|onClickLabel|contentDescription|label|supportingText|hint = "..."`, `onClick(label = "...")`, `CustomAccessibilityAction("...")`, and `Text(if (c) "A" else "B")` / `text = if (c) "A" else "B"`. Allow-list: the Compose animation labels `Alpha Animation` and `SwipeDeleteBackground`. Limits: it does not see a literal that reaches the UI through a variable, a `when` expression or a helper function, or a condition that has quotes of its own, so review those by eye.
 - **Dates & utilities**:
   - `Item.targetDate` is a `java.util.Date` anchored at 12:00 local time. Day counts go through `calculateDaysLeft` (`java.time.LocalDate` + `ChronoUnit.DAYS`, DST-safe) in `util/Utils.kt`. Material3 `DatePicker` speaks UTC-midnight millis, so use `localDateToUtcPickerMillis` / `utcPickerMillisToLocalDate` in `util/Utils.kt` rather than converting by hand.
   - `util/Utils.kt` also holds `isSingleGrapheme` (emoji validation), `isColorBright`, `vibrate`, and `AppVersionInfo` (reads version info via `PackageManager`). `BuildConfig` is enabled (`buildConfig = true`) and `BuildConfig.DEBUG` guards debug `Log.d` calls and Koin logging.
@@ -72,6 +88,28 @@ Use the `android` CLI as needed for Android workflows (`android --help` / `andro
 - `app/src/main/play/release-notes/` is generated by CI from commit subjects (`wip`, `ci`, `chore`, `docs`, `build`, and `merge` commits are dropped; conventional prefixes are stripped; 500 char cap) and is git-ignored. Write commit subjects accordingly.
 - Dependency versions live in `gradle/libs.versions.toml`. Dependabot is configured in `.github/dependabot.yml`; GitHub Actions are pinned by commit SHA.
 
+## Release and CI/CD (linked repos)
+
+This repo does not hold the release tooling. The shared CI/CD hub is a separate local git repo:
+
+- CI/CD hub: `/Users/guy/dev/android/cicd` (GCP project `happypuppy-play-cicd`, service accounts `play-ci-testing` and `play-ci-production`, keyless WIF auth). Read before any release work:
+  - `cicd/app-state.md`: living source of truth (per-app Play state, package names, keystore locations and aliases, what is live on which track).
+  - `cicd/workflows/existing-app-onboard-and-release.md`: the repeatable release checklist.
+  - `cicd/14-local-and-self-hosted-pipelines.md`: running the CI, release and promote workflows locally.
+  - `cicd/release-log.md`: history and lessons. `cicd/AGENTS.md`: workspace rule, `versionName` is always clean semver, never a commit hash.
+- Sibling app on the same pipeline: SpeechTimer_Jetpack (Simple Speech Timer, package com.happypuppy.toastmasterstimer) at /Users/guy/dev/android/SpeechTimer_Jetpack; same hub, same release workflows, its AGENTS.md points back here and to the hub
+- This repo's own workflows are `.github/workflows/ci.yml`, `release-internal.yml` and `promote.yml` (SHA-pinned). Local mirrors live in the hub and take this repo via `--repo-dir`; run them from the hub directory:
+
+```bash
+cd /Users/guy/dev/android/cicd
+scripts/local-ci.sh --repo-dir /Users/guy/dev/android/SimpleDayCounter
+scripts/local-release-internal.sh --repo-dir /Users/guy/dev/android/SimpleDayCounter --keystore <path from app-state.md> --alias <alias from app-state.md> --version-code auto --dry-run
+scripts/local-promote.sh --engine gplay --package com.happypuppy.daycounter --to production --action update-rollout --fraction 0.5
+```
+
+- Releasing from either app repo works the same way: the hub scripts take the app repo and package as arguments, so a release session can start in this repo or in the sibling and still find the hub and the other app through the paths above.
+- Rules: `--dry-run` first. Uploading to Play, promoting, or changing a rollout is outward-facing: only with the owner's explicit yes. Release from a clean, merged `main` unless the owner says otherwise (the local script refuses a dirty tree). Never commit keystores, `keystore.properties` or service-account files; the hub documents where they live, with locations only. Commit subjects feed the Play release notes (see Build, versioning and release above).
+
 ## Known gaps
 
-Remaining backlog items: extracting `FilterMenu`/`SortMenu` from `MainScreen` and moving filter/sort models out of UI files, replacing `NavController` parameters with lambdas, and migrating `java.util.Date` to `java.time.LocalDate`.
+`date_format_iso` keeps hyphens because the example text must equal the real ISO output, so lint reports `TypographyDashes` for it (the only lint warning besides `OldTargetApi`). Remaining backlog items: extracting `FilterMenu`/`SortMenu` from `MainScreen` and moving filter/sort models out of UI files, replacing `NavController` parameters with lambdas, and migrating `java.util.Date` to `java.time.LocalDate`.

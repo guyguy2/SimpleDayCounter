@@ -161,7 +161,7 @@ class EventViewModelEdgeCasesTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals("restore failed", state.error)
+        assertEquals(EventError.RestoreFailed, state.error)
         assertTrue(state.items.isEmpty())
         // Characterization: the undo slot is consumed even though the restore failed, so the user
         // cannot retry. A hardening wave should keep lastDeletedItem until the insert succeeds.

@@ -60,11 +60,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavHostController
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
@@ -85,10 +89,10 @@ fun SettingsScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -102,21 +106,31 @@ fun SettingsScreen(navController: NavHostController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            SettingsSectionHeader(stringResource(R.string.settings_section_appearance))
+
             ThemeSelector(dataStoreManager)
 
             HorizontalDivider()
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_general))
 
             VibrationSetting(dataStoreManager)
 
             HorizontalDivider()
 
+            SettingsSectionHeader(stringResource(R.string.settings_section_dates))
+
             DateFormatSetting(dataStoreManager)
 
             HorizontalDivider()
 
+            SettingsSectionHeader(stringResource(R.string.settings_section_categories))
+
             CategoryManagementSetting(navController)
 
             HorizontalDivider()
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_support))
 
             RateAppSetting()
 
@@ -127,6 +141,17 @@ fun SettingsScreen(navController: NavHostController) {
             AboutDialog(onDismiss = { showAboutDialog = false })
         }
     }
+}
+
+/** Section title for a group of settings rows; announced as a heading by screen readers. */
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.semantics { heading() }
+    )
 }
 
 @Composable
@@ -148,11 +173,11 @@ fun CategoryManagementSetting(navController: NavHostController) {
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Manage Categories",
+                text = stringResource(R.string.settings_manage_categories),
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "View and delete your custom categories",
+                text = stringResource(R.string.settings_manage_categories_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -171,14 +196,14 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
             .selectableGroup()
     ) {
         Text(
-            text = "Theme",
+            text = stringResource(R.string.settings_theme),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
         ThemeOption(
-            title = "System Default",
+            title = stringResource(R.string.settings_theme_system),
             icon = Icons.Outlined.Smartphone,
             selected = currentTheme == AppTheme.SYSTEM_DEFAULT,
             onClick = {
@@ -189,7 +214,7 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
         )
 
         ThemeOption(
-            title = "Light",
+            title = stringResource(R.string.settings_theme_light),
             icon = Icons.Outlined.LightMode,
             selected = currentTheme == AppTheme.LIGHT,
             onClick = {
@@ -200,7 +225,7 @@ fun ThemeSelector(dataStoreManager: DataStoreManager) {
         )
 
         ThemeOption(
-            title = "Dark",
+            title = stringResource(R.string.settings_theme_dark),
             icon = Icons.Outlined.DarkMode,
             selected = currentTheme == AppTheme.DARK,
             onClick = {
@@ -253,8 +278,8 @@ fun VibrationSetting(dataStoreManager: DataStoreManager) {
     val isEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
 
     SettingSwitch(
-        title = "Vibration",
-        description = "Vibrate when deleting an event",
+        title = stringResource(R.string.settings_vibration),
+        description = stringResource(R.string.settings_vibration_description),
         checked = isEnabled,
         icon = Icons.Outlined.Vibration,
         onCheckedChange = { enabled ->
@@ -363,7 +388,7 @@ fun RateAppSetting() {
             tint = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Rate App",
+            text = stringResource(R.string.settings_rate_app),
             style = MaterialTheme.typography.titleMedium
         )
     }
@@ -387,7 +412,7 @@ fun AboutSetting(onClick: () -> Unit) {
             tint = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "About",
+            text = stringResource(R.string.settings_about),
             style = MaterialTheme.typography.titleMedium
         )
     }
@@ -400,16 +425,16 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("About Simple Day Counter") },
+        title = { Text(stringResource(R.string.settings_about_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Count the moments that matter - track your important dates with elegance and simplicity.")
+                Text(stringResource(R.string.settings_about_description))
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row {
                     Text(
-                        text = "Version:",
+                        text = stringResource(R.string.settings_about_version),
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -418,13 +443,13 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("©2026 Simple Day Counter")
-                Text("All rights reserved")
+                Text(stringResource(R.string.settings_about_copyright))
+                Text(stringResource(R.string.settings_about_rights))
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK")
+                Text(stringResource(R.string.settings_about_ok))
             }
         }
     )
@@ -434,7 +459,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
 @Composable
 fun DateFormatSetting(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
-    val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
+    val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
     var showFormatOptions by remember { mutableStateOf(false) }
     val sampleDate = remember { Date() }
 
@@ -455,7 +480,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Date Display Format",
+                text = stringResource(R.string.settings_date_format_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -470,13 +495,13 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
-                    value = currentFormat.displayName,
+                    value = stringResource(currentFormat.displayNameRes),
                     onValueChange = { },
-                    label = { Text("Format") },
+                    label = { Text(stringResource(R.string.settings_date_format_label)) },
                     trailingIcon = {
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Select Format"
+                            contentDescription = stringResource(R.string.settings_date_format_select)
                         )
                     },
                     modifier = Modifier
@@ -493,9 +518,9 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(format.displayName)
+                                    Text(stringResource(format.displayNameRes))
                                     Text(
-                                        text = "Example: ${formatDate(sampleDate, format)}",
+                                        text = stringResource(R.string.settings_date_format_example, formatDate(sampleDate, format)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -508,7 +533,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
                                 showFormatOptions = false
                             },
                             trailingIcon = if (currentFormat == format) {
-                                { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                             } else null
                         )
                     }
@@ -516,7 +541,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
             }
 
             Text(
-                text = "Preview: $formattedDate",
+                text = stringResource(R.string.settings_date_format_preview, formattedDate),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp)

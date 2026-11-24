@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
 data class MainScreenUiState(
     val items: List<Item> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null,
+    val error: EventError? = null,
     val lastDeletedItem: Item? = null,
     val showUndoSnackbar: Boolean = false,
     val snackbarToken: Long = 0L,
@@ -45,8 +45,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     private fun observeItems() {
         viewModelScope.launch {
             repository.getAllItems()
-                .catch { e ->
-                    _uiState.update { it.copy(error = e.message ?: "Failed to load events", isLoading = false) }
+                .catch {
+                    _uiState.update { state -> state.copy(error = EventError.LoadFailed, isLoading = false) }
                 }
                 .collect { items ->
                     _uiState.update { it.copy(items = items, isLoading = false) }
@@ -68,8 +68,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                 )
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to save event") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = EventError.SaveFailed) }
             }
         }
     }
@@ -80,8 +80,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                 repository.insertItem(item)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to update event") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = EventError.UpdateFailed) }
             }
         }
     }
@@ -107,8 +107,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Item ${item.id} deleted from repository")
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to delete event") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = EventError.DeleteFailed) }
             } finally {
                 pendingDeleteJobs.remove(item.id)
             }
@@ -139,8 +139,8 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                 repository.insertItem(deletedItem)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to restore event") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = EventError.RestoreFailed) }
                 return@launch
             }
 

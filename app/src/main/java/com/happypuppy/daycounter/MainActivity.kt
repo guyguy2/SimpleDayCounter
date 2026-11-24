@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val dataStoreManager = koinInject<DataStoreManager>()
             val themePreference by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
-            val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.DEFAULT)
+            val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
             val isSystemInDarkTheme = isSystemInDarkTheme()
 
             val useDarkTheme = when (themePreference) {

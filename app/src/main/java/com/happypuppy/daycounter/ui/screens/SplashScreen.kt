@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,7 @@ fun SplashScreen() {
             // App logo
             Image(
                 painter = painterResource(id = R.drawable.counter_icon_modern1),
-                contentDescription = "App Logo",
+                contentDescription = stringResource(R.string.splash_logo_cd),
                 modifier = Modifier.size(160.dp)
             )
 
@@ -64,7 +65,7 @@ fun SplashScreen() {
 
             // App name
             Text(
-                text = "Simple Day Counter",
+                text = stringResource(R.string.app_name),
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
@@ -75,7 +76,7 @@ fun SplashScreen() {
 
             // Tagline
             Text(
-                text = "Track your important dates with ease",
+                text = stringResource(R.string.splash_tagline),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center

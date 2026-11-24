@@ -54,6 +54,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Adds the en-XA (accented, expanded) and ar-XB (mirrored) pseudolocales to debug builds only.
+            isPseudoLocalesEnabled = true
+        }
         release {
             // R8 full mode: code shrinking, optimization, and resource shrinking.
             // Keep rules for Room/Koin/Coroutines/Navigation live in proguard-rules.pro.

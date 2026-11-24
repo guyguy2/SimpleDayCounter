@@ -307,7 +307,7 @@ class EventViewModelTest {
         val viewModel = EventViewModel(ItemRepository(failingDao))
         advanceUntilIdle()
 
-        assertEquals("Disk corrupted", viewModel.uiState.value.error)
+        assertEquals(EventError.LoadFailed, viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isLoading)
 
         viewModel.clearError()
@@ -324,19 +324,19 @@ class EventViewModelTest {
         dao.insertError = IOException("Insert failed")
         viewModel.saveItem("New", "Work", Date())
         advanceUntilIdle()
-        assertEquals("Insert failed", viewModel.uiState.value.error)
+        assertEquals(EventError.SaveFailed, viewModel.uiState.value.error)
 
         viewModel.clearError()
         viewModel.updateItem(existing.copy(name = "Edited"))
         advanceUntilIdle()
-        assertEquals("Insert failed", viewModel.uiState.value.error)
+        assertEquals(EventError.UpdateFailed, viewModel.uiState.value.error)
 
         dao.insertError = null
         dao.deleteError = IOException("Delete failed")
         viewModel.deleteItem(existing)
         advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
-        assertEquals("Delete failed", viewModel.uiState.value.error)
+        assertEquals(EventError.DeleteFailed, viewModel.uiState.value.error)
     }
 
     @Test
