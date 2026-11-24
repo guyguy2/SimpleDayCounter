@@ -10,9 +10,11 @@ import java.io.File
  * res/values/strings.xml. Fails when a Compose `Text("...")`, `text = "..."`,
  * `contentDescription = "..."` and similar literals with a letter in them appear in app/src/main.
  *
- * Narrow allow-list ([ALLOWED_LITERALS]): animation `label` values, which are Compose tooling
- * names and never shown. Known limit: a literal that reaches the UI through a variable or an
- * `if`/`when` expression is not seen; review those by eye.
+ * Also catches `Text(if (c) "A" else "B")` and `text = if (c) "A" else "B"`. Narrow allow-list
+ * ([ALLOWED_LITERALS]): animation `label` values, which are Compose tooling names and never
+ * shown. Known limits: a literal that reaches the UI through a variable, a `when` expression or
+ * a helper function is not seen, and neither is a literal inside a condition that has quotes of
+ * its own; review those by eye.
  */
 class StringLiteralGuardTest {
 
@@ -60,6 +62,23 @@ class StringLiteralGuardTest {
     }
 
     @Test
+    fun `detector flags literals in if else expressions used as text`() {
+        val source = """
+            Text(if (isEmpty) "First" else "Second")
+            Text(
+                text = if (filtered)
+                    "Third"
+                else stringResource(R.string.ok)
+            )
+            Text(text = if (filtered) stringResource(R.string.ok) else "Fourth")
+            Text(text = if (filtered) stringResource(R.string.ok) else stringResource(R.string.cancel))
+            Text(if (category == KEY) stringResource(R.string.add) else category)
+        """.trimIndent()
+
+        assertEquals(listOf("First", "Second", "Third", "Fourth"), findUserFacingLiterals(source))
+    }
+
+    @Test
     fun `detector ignores resources, symbols and the allow-list`() {
         val source = """
             Text(stringResource(R.string.main_title))
@@ -81,11 +100,17 @@ class StringLiteralGuardTest {
 
         // A literal counts only if it contains a letter: "+" or "" are symbols, not copy.
         const val LITERAL = "\"([^\"\\n]*[A-Za-z][^\"\\n]*)\""
+        const val TEXT_SINK =
+            """(?:\bText\(|\b(?:text|title|description|placeholder|message|actionLabel|onClickLabel|contentDescription|label|supportingText|hint)\s*=)"""
         val PATTERNS = listOf(
             Regex("""\bText\(\s*$LITERAL"""),
             Regex("""\b(?:text|title|description|placeholder|message|actionLabel|onClickLabel|contentDescription|label|supportingText|hint)\s*=\s*$LITERAL"""),
             Regex("""\bonClick\(\s*label\s*=\s*$LITERAL"""),
-            Regex("""\bCustomAccessibilityAction\(\s*$LITERAL""")
+            Regex("""\bCustomAccessibilityAction\(\s*$LITERAL"""),
+            // Text(if (c) "A" else "B") and text = if (c) "A" else "B": the literal after the condition...
+            Regex("""$TEXT_SINK\s*if\s*\([^"{}]{0,200}\)\s*$LITERAL"""),
+            // ...and the literal after else (the then-branch may itself be a resource call)
+            Regex("""$TEXT_SINK\s*if\b[^{}]{0,300}?\belse\s+$LITERAL""")
         )
 
         fun findUserFacingLiterals(source: String): List<String> =
