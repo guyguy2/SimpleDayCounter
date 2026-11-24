@@ -11,6 +11,11 @@ import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.data.preferences.THEME_KEY
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -97,5 +102,74 @@ class StartupSettingsTest {
         )
 
         assertEquals(AppSettings(AppTheme.DARK, DateFormat.EU), startup.settings.value)
+    }
+
+    // A stalled first read must not hold the splash forever.
+
+    private val neverEmits = flow<AppSettings> { awaitCancellation() }
+
+    @Test
+    fun `a stalled first read resolves to the defaults after the timeout`() = runTest {
+        val startup = StartupSettings()
+        val job = launch { startup.collectFrom(neverEmits) }
+
+        advanceTimeBy(StartupSettings.FIRST_READ_TIMEOUT_MS - 1)
+        runCurrent()
+        assertFalse("still waiting just before the timeout", startup.isResolved)
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertTrue("splash released by the timeout", startup.isResolved)
+        assertEquals(AppSettings.Defaults, startup.settings.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `a never completing DataStore read is released by the timeout`() = runTest {
+        val stalled = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { awaitCancellation() }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                awaitCancellation()
+        }
+        val startup = StartupSettings()
+        val job = launch { startup.collectFrom(DataStoreManager(stalled).settingsFlow) }
+
+        advanceTimeBy(StartupSettings.FIRST_READ_TIMEOUT_MS + 1)
+        runCurrent()
+
+        assertTrue(startup.isResolved)
+        assertEquals(AppSettings.Defaults, startup.settings.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `a read that finishes in time keeps its value after the timeout passes`() = runTest {
+        val startup = StartupSettings()
+        val stored = AppSettings(AppTheme.DARK, DateFormat.ISO)
+        val job = launch { startup.collectFrom(flow { delay(500); emit(stored); awaitCancellation() }) }
+
+        advanceTimeBy(StartupSettings.FIRST_READ_TIMEOUT_MS * 2)
+        runCurrent()
+
+        assertEquals(stored, startup.settings.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `a read that arrives after the timeout replaces the defaults`() = runTest {
+        val startup = StartupSettings()
+        val stored = AppSettings(AppTheme.LIGHT, DateFormat.US, dynamicColor = true)
+        val job = launch {
+            startup.collectFrom(flow { delay(StartupSettings.FIRST_READ_TIMEOUT_MS + 500); emit(stored); awaitCancellation() })
+        }
+
+        advanceTimeBy(StartupSettings.FIRST_READ_TIMEOUT_MS + 1)
+        runCurrent()
+        assertEquals(AppSettings.Defaults, startup.settings.value)
+
+        advanceTimeBy(600)
+        runCurrent()
+        assertEquals(stored, startup.settings.value)
+        job.cancel()
     }
 }
