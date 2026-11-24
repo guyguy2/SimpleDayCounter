@@ -18,7 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.ui.screens.FilterOption
 import com.happypuppy.daycounter.ui.screens.FilterState
 
@@ -26,10 +28,10 @@ import com.happypuppy.daycounter.ui.screens.FilterState
 fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
     val filterText = when (filterState.option) {
         FilterOption.ALL -> return // No chip for ALL filter
-        FilterOption.FUTURE -> "Future Events"
-        FilterOption.TODAY -> "Today's Events"
-        FilterOption.PAST -> "Past Events"
-        FilterOption.CATEGORY -> "Category: ${filterState.category}"
+        FilterOption.FUTURE -> stringResource(R.string.filter_future)
+        FilterOption.TODAY -> stringResource(R.string.filter_today)
+        FilterOption.PAST -> stringResource(R.string.filter_past)
+        FilterOption.CATEGORY -> stringResource(R.string.filter_chip_category, filterState.category.toString())
     }
 
     Surface(
@@ -58,7 +60,7 @@ fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
             IconButton(onClick = onClear) {
                 Icon(
                     imageVector = Icons.Default.Clear,
-                    contentDescription = "Clear Filter",
+                    contentDescription = stringResource(R.string.filter_clear),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )

@@ -103,4 +103,8 @@
     <string name="category_mgmt_delete_all_message">Are you sure you want to delete all custom categories? This action cannot be undone.</string>
     <string name="category_mgmt_delete_all_confirm">Delete All</string>
     <string name="category_mgmt_delete_cd">Delete Category</string>
+    <string name="filter_chip_category">Category: %1$s</string>
+    <string name="filter_clear">Clear Filter</string>
+    <string name="splash_logo_cd">App Logo</string>
+    <string name="splash_tagline">Track your important dates with ease</string>
 </resources>
