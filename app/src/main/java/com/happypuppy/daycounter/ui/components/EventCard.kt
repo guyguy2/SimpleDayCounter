@@ -49,7 +49,9 @@ import com.happypuppy.daycounter.ui.theme.DarkOnSurface
 import com.happypuppy.daycounter.ui.theme.DarkOnSurfaceVariant
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
+import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.calculateDaysLeft
+import com.happypuppy.daycounter.util.dayLabelFor
 import com.happypuppy.daycounter.util.isColorBright
 
 @Composable
@@ -209,12 +211,10 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = if (daysLeft > 0) {
-                        if (daysLeft == 1) "day left" else "days left"
-                    } else if (daysLeft < 0) {
-                        if (daysLeft == -1) "day past" else "days past"
-                    } else {
-                        "Today!"
+                    text = when (val label = dayLabelFor(daysLeft)) {
+                        DayLabel.Today -> "Today!"
+                        is DayLabel.Left -> if (label.days == 1) "day left" else "days left"
+                        is DayLabel.Past -> if (label.days == 1) "day past" else "days past"
                     },
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center
