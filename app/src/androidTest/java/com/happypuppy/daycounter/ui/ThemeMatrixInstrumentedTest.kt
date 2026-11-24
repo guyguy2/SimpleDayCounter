@@ -22,16 +22,21 @@ import org.koin.core.context.GlobalContext
 import kotlin.math.abs
 
 /**
- * UX-3: the app's first screen uses the stored theme, whatever the system mode is. Each test
- * launches a fresh MainActivity for one cell of the system (light/dark) x app (system/light/dark)
- * matrix and checks the pixels on screen. The theme is stored before launch, so the splash
- * keep condition has to hand over the resolved value, not the placeholder.
+ * UX-3: the settled screen uses the stored theme, whatever the system mode is. Each test launches a
+ * fresh MainActivity for one cell of the system (light/dark) x app (system/light/dark) matrix and
+ * checks the background pixel on screen.
+ *
+ * This is a settled-state matrix, NOT a first-frame proof: it runs in a warm process (DataStore
+ * already open) and polls up to 5 s for the splash fade to finish, so a brief wrong-theme frame
+ * would not fail it. The first-frame and flash check is the manual screenrecord procedure in
+ * AGENTS.md (real process start, every frame sampled). What these tests do prove is the hand-over:
+ * the theme stored before launch is what the activity ends up rendering, for all six cells.
  *
  * Changes the emulator's night mode (`cmd uimode night`) and resets it to "no" afterwards.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
-class ColdStartThemeInstrumentedTest {
+class ThemeMatrixInstrumentedTest {
 
     @get:Rule
     val rule = createEmptyComposeRule()
