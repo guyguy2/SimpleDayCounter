@@ -140,7 +140,7 @@ class MainFlowInstrumentedTest {
         fieldNode("Category").assertExists()
         semanticClick("Category")
         rule.waitUntilExactlyOneExists(hasText("Work"), timeoutMillis = 5_000)
-        rule.onNodeWithText("Add Custom...").assertExists()
+        rule.onNodeWithText("Add Custom\u2026").assertExists()
     }
 
     private fun assertDateFieldOpensPickerAndIsASingleButton() {
