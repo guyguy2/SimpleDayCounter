@@ -54,6 +54,7 @@ import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddCategoryInput
 import com.happypuppy.daycounter.ui.components.CategoryColorIndicator
+import com.happypuppy.daycounter.ui.components.categoryDisplayName
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
@@ -395,7 +396,7 @@ private fun CategoryItem(
             Spacer(modifier = Modifier.width(16.dp))
 
             Text(
-                text = category,
+                text = categoryDisplayName(category),
                 modifier = Modifier.weight(1f)
             )
 

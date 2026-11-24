@@ -107,4 +107,8 @@
     <string name="filter_clear">Clear Filter</string>
     <string name="splash_logo_cd">App Logo</string>
     <string name="splash_tagline">Track your important dates with ease</string>
+    <string name="category_personal">Personal</string>
+    <string name="category_work">Work</string>
+    <string name="category_health">Health</string>
+    <string name="category_finance">Finance</string>
 </resources>

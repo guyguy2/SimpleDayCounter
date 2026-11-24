@@ -63,7 +63,7 @@ fun CategorySelector(
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
-                value = selectedCategory,
+                value = categoryDisplayName(selectedCategory),
                 onValueChange = { /* readonly */ },
                 label = { Text(stringResource(R.string.category_label)) },
                 modifier = Modifier
@@ -100,7 +100,7 @@ fun CategorySelector(
                             }
                         },
                         text = {
-                            Text(if (category == ADD_CUSTOM_CATEGORY_KEY) stringResource(R.string.category_add_custom) else category)
+                            Text(if (category == ADD_CUSTOM_CATEGORY_KEY) stringResource(R.string.category_add_custom) else categoryDisplayName(category))
                         },
                         onClick = {
                             if (category == ADD_CUSTOM_CATEGORY_KEY) {

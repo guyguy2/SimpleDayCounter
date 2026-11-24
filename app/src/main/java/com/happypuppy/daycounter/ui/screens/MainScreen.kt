@@ -88,6 +88,7 @@ import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.FilterChip
+import com.happypuppy.daycounter.ui.components.categoryDisplayName
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.vibrate
@@ -308,7 +309,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         ) {
                             allCategories.forEach { category ->
                                 DropdownMenuItem(
-                                    text = { Text(category) },
+                                    text = { Text(categoryDisplayName(category)) },
                                     onClick = {
                                         filterState = FilterState(
                                             option = FilterOption.CATEGORY,

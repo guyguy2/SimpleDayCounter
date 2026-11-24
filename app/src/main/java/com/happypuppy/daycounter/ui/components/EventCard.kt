@@ -181,7 +181,7 @@ fun EventCard(
                 // Category
                 if (item.itemCategory.isNotBlank()) {
                     Text(
-                        text = item.itemCategory,
+                        text = categoryDisplayName(item.itemCategory),
                         style = MaterialTheme.typography.bodySmall,
                         color = secondaryTextColor
                     )

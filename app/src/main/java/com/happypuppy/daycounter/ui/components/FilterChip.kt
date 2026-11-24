@@ -31,7 +31,7 @@ fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
         FilterOption.FUTURE -> stringResource(R.string.filter_future)
         FilterOption.TODAY -> stringResource(R.string.filter_today)
         FilterOption.PAST -> stringResource(R.string.filter_past)
-        FilterOption.CATEGORY -> stringResource(R.string.filter_chip_category, filterState.category.toString())
+        FilterOption.CATEGORY -> stringResource(R.string.filter_chip_category, filterState.category?.let { categoryDisplayName(it) }.toString())
     }
 
     Surface(
