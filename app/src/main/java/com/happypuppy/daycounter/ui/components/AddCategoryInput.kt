@@ -20,8 +20,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -64,7 +66,7 @@ fun AddCategoryInput(
     dataStoreManager: DataStoreManager,
     onCategoryAdded: (String) -> Unit = {},
     onCancel: () -> Unit = {},
-    placeholder: String = "Enter a new category name",
+    placeholder: String = stringResource(R.string.category_name_placeholder),
 ) {
     var categoryText by rememberSaveable { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }
@@ -78,11 +80,11 @@ fun AddCategoryInput(
     OutlinedTextField(
         value = categoryText,
         onValueChange = { categoryText = it },
-        label = { Text("New Category") },
+        label = { Text(stringResource(R.string.category_new_label)) },
         placeholder = { Text(placeholder) },
         isError = isDuplicate,
         supportingText = if (isDuplicate) {
-            { Text("Category already exists") }
+            { Text(stringResource(R.string.category_exists)) }
         } else {
             null
         },
@@ -99,7 +101,7 @@ fun AddCategoryInput(
                 }) {
                     Icon(
                         imageVector = Icons.Default.Clear,
-                        contentDescription = "Cancel"
+                        contentDescription = stringResource(R.string.common_cancel)
                     )
                 }
                 IconButton(
@@ -126,7 +128,7 @@ fun AddCategoryInput(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "Confirm"
+                        contentDescription = stringResource(R.string.common_confirm)
                     )
                 }
             }

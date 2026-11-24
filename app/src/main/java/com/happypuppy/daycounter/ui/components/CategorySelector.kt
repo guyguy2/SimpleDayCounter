@@ -19,7 +19,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.navigation.Screen
 import com.happypuppy.daycounter.ui.theme.CategoryColors
@@ -27,6 +29,9 @@ import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 
 // Predefined default categories
 val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
+
+/** Menu sentinel for the "Add Custom..." entry; shown through a string resource, never stored. */
+private const val ADD_CUSTOM_CATEGORY_KEY = "Add Custom..."
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +52,7 @@ fun CategorySelector(
 
     // Combine default and alphabetically sorted custom categories for the dropdown
     val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER) + "Add Custom..."
+        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER) + ADD_CUSTOM_CATEGORY_KEY
     }
 
     Column(modifier = modifier) {
@@ -60,14 +65,14 @@ fun CategorySelector(
             OutlinedTextField(
                 value = selectedCategory,
                 onValueChange = { /* readonly */ },
-                label = { Text("Category") },
+                label = { Text(stringResource(R.string.category_label)) },
                 modifier = Modifier
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     .fillMaxWidth(),
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Select Category"
+                        contentDescription = stringResource(R.string.category_select)
                     )
                 },
                 leadingIcon = {
@@ -87,16 +92,18 @@ fun CategorySelector(
                 allCategories.forEach { category ->
                     DropdownMenuItem(
                         leadingIcon = {
-                            if (category != "Add Custom...") {
+                            if (category != ADD_CUSTOM_CATEGORY_KEY) {
                                 // Show color indicator for each category in dropdown
                                 CategoryColorIndicator(
                                     color = CategoryColors.getCategoryColor(category, isDarkTheme)
                                 )
                             }
                         },
-                        text = { Text(category) },
+                        text = {
+                            Text(if (category == ADD_CUSTOM_CATEGORY_KEY) stringResource(R.string.category_add_custom) else category)
+                        },
                         onClick = {
-                            if (category == "Add Custom...") {
+                            if (category == ADD_CUSTOM_CATEGORY_KEY) {
                                 // Navigate to the Category Management screen instead of showing input
                                 navController?.navigate(Screen.CategoryManagement)
                             } else {

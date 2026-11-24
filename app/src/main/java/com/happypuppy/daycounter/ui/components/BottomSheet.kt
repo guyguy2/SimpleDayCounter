@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.happypuppy.daycounter.BuildConfig
+import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
@@ -90,7 +92,7 @@ fun AddEventBottomSheet(
             .padding(16.dp)
     ) {
         Text(
-            text = "Add New Event",
+            text = stringResource(R.string.add_event_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -101,7 +103,7 @@ fun AddEventBottomSheet(
         OutlinedTextField(
             value = eventName,
             onValueChange = { eventName = it },
-            label = { Text("Event Name") },
+            label = { Text(stringResource(R.string.form_event_name)) },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words
@@ -118,8 +120,8 @@ fun AddEventBottomSheet(
                     eventEmoji = newValue
                 }
             },
-            label = { Text("Optional Emoji") },
-            placeholder = { Text("Enter an emoji character") },
+            label = { Text(stringResource(R.string.form_optional_emoji)) },
+            placeholder = { Text(stringResource(R.string.form_emoji_placeholder)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -129,17 +131,18 @@ fun AddEventBottomSheet(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val selectDateAction = stringResource(R.string.form_select_date_action)
         // Target date field: the read-only field itself is the single focus target and acts as a
         // button that opens the date picker (no overlay).
         OutlinedTextField(
             value = formatDate(targetDate, dateFormat),
             onValueChange = { /* readonly */ },
-            label = { Text("Target Date") },
+            label = { Text(stringResource(R.string.form_target_date)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics {
                     role = Role.Button
-                    onClick(label = "Select date") {
+                    onClick(label = selectDateAction) {
                         showDatePicker = true
                         true
                     }
@@ -147,7 +150,7 @@ fun AddEventBottomSheet(
             trailingIcon = {
                 Icon(
                     Icons.Outlined.CalendarMonth,
-                    contentDescription = "Select Date"
+                    contentDescription = stringResource(R.string.form_select_date)
                 )
             },
             readOnly = true,
@@ -173,7 +176,7 @@ fun AddEventBottomSheet(
             horizontalArrangement = Arrangement.End
         ) {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_cancel))
             }
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -187,7 +190,7 @@ fun AddEventBottomSheet(
                 },
                 enabled = eventName.isNotBlank()
             ) {
-                Text("Save Event")
+                Text(stringResource(R.string.add_event_save))
             }
         }
     }
@@ -212,7 +215,7 @@ fun AddEventBottomSheet(
                     }
                     showDatePicker = false
                 }) {
-                    Text("Confirm")
+                    Text(stringResource(R.string.common_confirm))
                 }
             },
             dismissButton = {
@@ -220,7 +223,7 @@ fun AddEventBottomSheet(
                     if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker cancelled")
                     showDatePicker = false
                 }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         ) {
