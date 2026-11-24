@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -230,6 +231,30 @@ class MainFlowInstrumentedTest {
         rule.waitUntil(timeoutMillis = 5_000) {
             rule.onAllNodes(hasText("Example:", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    @Test
+    fun settingsRowsAreGroupedUnderHeadingsInOrder() {
+        openSettings()
+
+        // The settings column is not lazy, so every node has a position even when scrolled out.
+        val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
+        fun top(text: String, heading: Boolean): Float {
+            val matcher = if (heading) hasText(text) and isHeading else hasText(text) and !isHeading
+            return rule.onNode(matcher).fetchSemanticsNode().positionInRoot.y
+        }
+
+        val expectedOrder = listOf(
+            "Appearance" to true, "Theme" to false,
+            "General" to true, "Vibration" to false,
+            "Dates" to true, "Date Display Format" to false,
+            "Categories" to true, "Manage Categories" to false,
+            "Support" to true, "Rate App" to false
+        )
+        val tops = expectedOrder.map { (text, heading) -> top(text, heading) }
+
+        assertEquals("headings and rows are in section order", tops.sorted(), tops)
+        assertEquals("every position is distinct", tops.size, tops.toSet().size)
     }
 
     @Test

@@ -62,6 +62,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -104,21 +106,31 @@ fun SettingsScreen(navController: NavHostController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            SettingsSectionHeader(stringResource(R.string.settings_section_appearance))
+
             ThemeSelector(dataStoreManager)
 
             HorizontalDivider()
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_general))
 
             VibrationSetting(dataStoreManager)
 
             HorizontalDivider()
 
+            SettingsSectionHeader(stringResource(R.string.settings_section_dates))
+
             DateFormatSetting(dataStoreManager)
 
             HorizontalDivider()
 
+            SettingsSectionHeader(stringResource(R.string.settings_section_categories))
+
             CategoryManagementSetting(navController)
 
             HorizontalDivider()
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_support))
 
             RateAppSetting()
 
@@ -129,6 +141,17 @@ fun SettingsScreen(navController: NavHostController) {
             AboutDialog(onDismiss = { showAboutDialog = false })
         }
     }
+}
+
+/** Section title for a group of settings rows; announced as a heading by screen readers. */
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.semantics { heading() }
+    )
 }
 
 @Composable
