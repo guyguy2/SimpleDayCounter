@@ -103,14 +103,16 @@ fun EventCard(
 
     // Swipe is not available to every user, so expose Delete as an accessibility action too.
     // Edit is the card's labelled click ("Edit event"), so it is not repeated as a custom action.
+    val deleteLabel = stringResource(R.string.common_delete)
+    val editLabel = stringResource(R.string.event_card_edit)
     val accessibilityActions = buildList {
-        if (onDelete != null) add(CustomAccessibilityAction("Delete") { onDelete(); true })
+        if (onDelete != null) add(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClickLabel = "Edit event") { onClick() }
+            .clickable(role = Role.Button, onClickLabel = editLabel) { onClick() }
             .semantics { customActions = accessibilityActions },
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor,

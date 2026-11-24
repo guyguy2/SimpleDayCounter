@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -191,12 +192,13 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
 
     // Show undo snackbar whenever a new delete event occurs (keyed on monotonic token so
     // consecutive deletes replace the previous snackbar cleanly).
+    val resources = LocalResources.current
     LaunchedEffect(uiState.snackbarToken) {
         val deletedItem = uiState.lastDeletedItem
         if (uiState.showUndoSnackbar && deletedItem != null) {
             val result = snackbarHostState.showSnackbar(
-                message = "\"${deletedItem.name}\" deleted",
-                actionLabel = "Undo",
+                message = resources.getString(R.string.main_event_deleted, deletedItem.name),
+                actionLabel = resources.getString(R.string.main_undo),
                 duration = SnackbarDuration.Long
             )
             when (result) {
@@ -223,7 +225,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         Icon(
                             imageVector = if (filterState.option != FilterOption.ALL)
                                 Icons.Default.FilterAlt else Icons.Default.FilterList,
-                            contentDescription = "Filter"
+                            contentDescription = stringResource(R.string.main_filter)
                         )
 
                         DropdownMenu(
@@ -231,52 +233,52 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             onDismissRequest = { showFilterMenu = false }
                         ) {
                             Text(
-                                text = "Filter by",
+                                text = stringResource(R.string.filter_by),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                             DropdownMenuItem(
-                                text = { Text("All Events") },
+                                text = { Text(stringResource(R.string.filter_all)) },
                                 onClick = {
                                     filterState = FilterState(option = FilterOption.ALL)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.ALL) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
 
                             DropdownMenuItem(
-                                text = { Text("Future Events") },
+                                text = { Text(stringResource(R.string.filter_future)) },
                                 onClick = {
                                     filterState = FilterState(option = FilterOption.FUTURE)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.FUTURE) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
 
                             DropdownMenuItem(
-                                text = { Text("Today's Events") },
+                                text = { Text(stringResource(R.string.filter_today)) },
                                 onClick = {
                                     filterState = FilterState(option = FilterOption.TODAY)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.TODAY) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
 
                             DropdownMenuItem(
-                                text = { Text("Past Events") },
+                                text = { Text(stringResource(R.string.filter_past)) },
                                 onClick = {
                                     filterState = FilterState(option = FilterOption.PAST)
                                     showFilterMenu = false
                                 },
                                 trailingIcon = if (filterState.option == FilterOption.PAST) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
 
@@ -286,17 +288,17 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("Filter by Category")
+                                        Text(stringResource(R.string.filter_by_category))
                                         Spacer(modifier = Modifier.weight(1f))
                                         Icon(
                                             imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = "Show Categories"
+                                            contentDescription = stringResource(R.string.main_show_categories)
                                         )
                                     }
                                 },
                                 onClick = { showCategoryFilterOptions = true },
                                 trailingIcon = if (filterState.option == FilterOption.CATEGORY) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                         }
@@ -321,7 +323,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                                         {
                                             Icon(
                                                 Icons.Default.Check,
-                                                contentDescription = "Selected"
+                                                contentDescription = stringResource(R.string.common_selected)
                                             )
                                         }
                                     } else null
@@ -332,7 +334,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = "Sort"
+                            contentDescription = stringResource(R.string.main_sort)
                         )
 
                         DropdownMenu(
@@ -340,89 +342,89 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             onDismissRequest = { showSortMenu = false }
                         ) {
                             Text(
-                                text = "Sort by",
+                                text = stringResource(R.string.main_sort_by),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                             DropdownMenuItem(
-                                text = { Text("Name (A-Z)") },
+                                text = { Text(stringResource(R.string.main_sort_name_asc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.NAME_ASC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.NAME_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Name (Z-A)") },
+                                text = { Text(stringResource(R.string.main_sort_name_desc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.NAME_DESC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.NAME_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Category (A-Z)") },
+                                text = { Text(stringResource(R.string.main_sort_category_asc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.CATEGORY_ASC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.CATEGORY_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Category (Z-A)") },
+                                text = { Text(stringResource(R.string.main_sort_category_desc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.CATEGORY_DESC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.CATEGORY_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Target Date (Earliest first)") },
+                                text = { Text(stringResource(R.string.main_sort_target_date_asc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.TARGET_DATE_ASC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.TARGET_DATE_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Target Date (Latest first)") },
+                                text = { Text(stringResource(R.string.main_sort_target_date_desc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.TARGET_DATE_DESC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.TARGET_DATE_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Date Added (Oldest first)") },
+                                text = { Text(stringResource(R.string.main_sort_date_added_asc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.DATE_ADDED_ASC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.DATE_ADDED_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                             DropdownMenuItem(
-                                text = { Text("Date Added (Newest first)") },
+                                text = { Text(stringResource(R.string.main_sort_date_added_desc)) },
                                 onClick = {
                                     selectedSortOption = SortOption.DATE_ADDED_DESC
                                     showSortMenu = false
                                 },
                                 trailingIcon = if (selectedSortOption == SortOption.DATE_ADDED_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                                 } else null
                             )
                         }
@@ -431,7 +433,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                     IconButton(onClick = { navController.navigate(Screen.Settings) }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings"
+                            contentDescription = stringResource(R.string.main_settings)
                         )
                     }
                 }
@@ -490,7 +492,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                             )
                             TextButton(onClick = { viewModel.clearError() }) {
                                 Text(
-                                    text = "Dismiss",
+                                    text = stringResource(R.string.main_dismiss),
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
@@ -534,15 +536,15 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
                         ) {
                             Text(
                                 text = if (filterState.option != FilterOption.ALL)
-                                    "No Events Match Filter" else "No Events Yet",
+                                    stringResource(R.string.main_empty_filtered_title) else stringResource(R.string.main_empty_title),
                                 style = MaterialTheme.typography.headlineMedium,
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = if (filterState.option != FilterOption.ALL)
-                                    "Try changing your filter settings"
-                                else "Tap the + button to add your first event",
+                                    stringResource(R.string.main_empty_filtered_hint)
+                                else stringResource(R.string.main_empty_hint),
                                 style = MaterialTheme.typography.bodyLarge,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -637,7 +639,7 @@ fun MainScreen(navController: NavHostController, viewModel: EventViewModel = koi
 @Composable
 internal fun MainTopBarTitle() {
     Text(
-        text = "Simple Day Counter",
+        text = stringResource(R.string.app_name),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -710,7 +712,7 @@ fun SwipeToDeleteItem(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(R.string.common_delete),
                         tint = MaterialTheme.colorScheme.onError,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
