@@ -21,12 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
 import com.happypuppy.daycounter.ui.screens.FilterOption
 import com.happypuppy.daycounter.ui.screens.FilterState
 
 @Composable
 fun FilterChip(
     filterState: FilterState,
+    categories: List<Category>,
     onClear: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -35,7 +37,15 @@ fun FilterChip(
         FilterOption.FUTURE -> stringResource(R.string.filter_future)
         FilterOption.TODAY -> stringResource(R.string.filter_today)
         FilterOption.PAST -> stringResource(R.string.filter_past)
-        FilterOption.CATEGORY -> stringResource(R.string.filter_chip_category, filterState.category?.let { categoryDisplayName(it) }.toString())
+        FilterOption.CATEGORY -> {
+            val matched = categories.find { it.id == filterState.category }
+            val display = if (matched != null) {
+                categoryDisplayName(matched)
+            } else {
+                filterState.category.orEmpty()
+            }
+            stringResource(R.string.filter_chip_category, display)
+        }
     }
 
     Surface(

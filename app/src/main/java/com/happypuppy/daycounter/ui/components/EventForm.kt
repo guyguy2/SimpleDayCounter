@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,19 +59,22 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.isSingleGrapheme
-import com.happypuppy.daycounter.util.localDateToNoonDate
 import com.happypuppy.daycounter.util.localDateToUtcPickerMillis
-import com.happypuppy.daycounter.util.todayAtNoon
 import com.happypuppy.daycounter.util.utcPickerMillisToLocalDate
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Date
 
 const val MAX_EVENT_NAME_LENGTH = 100
 
@@ -102,15 +106,12 @@ enum class QuickDatePreset(@StringRes val labelRes: Int) {
     NEXT_WEEK(R.string.form_preset_one_week),
     NEXT_MONTH(R.string.form_preset_one_month);
 
-    /** Resolves this preset relative to [today] as a noon-anchored [Date] in [zoneId]. */
-    fun resolveDate(today: LocalDate, zoneId: ZoneId = ZoneId.systemDefault()): Date {
-        val targetLocalDate = when (this) {
-            TODAY -> today
-            TOMORROW -> today.plusDays(1)
-            NEXT_WEEK -> today.plusWeeks(1)
-            NEXT_MONTH -> today.plusMonths(1)
-        }
-        return localDateToNoonDate(targetLocalDate, zoneId)
+    /** Resolves this preset relative to [today]. */
+    fun resolveDate(today: LocalDate): LocalDate = when (this) {
+        TODAY -> today
+        TOMORROW -> today.plusDays(1)
+        NEXT_WEEK -> today.plusWeeks(1)
+        NEXT_MONTH -> today.plusMonths(1)
     }
 }
 
@@ -120,8 +121,8 @@ enum class QuickDatePreset(@StringRes val labelRes: Int) {
 data class EventFormState(
     val name: String = "",
     val emoji: String = "",
-    val targetDate: Date = todayAtNoon(),
-    val selectedCategory: String = defaultCategories.first()
+    val targetDate: LocalDate = LocalDate.now(),
+    val selectedCategoryId: String = DEFAULT_CATEGORY_ID
 ) {
     val trimmedName: String get() = name.trim()
     val isNameTooLong: Boolean get() = name.length > MAX_EVENT_NAME_LENGTH
@@ -136,20 +137,20 @@ data class EventFormState(
     fun toggleEmojiSuggestion(emoji: String): EventFormState =
         if (this.emoji == emoji) copy(emoji = "") else withEmoji(emoji)
 
-    fun withTargetDate(date: Date): EventFormState = copy(targetDate = date)
+    fun withTargetDate(date: LocalDate): EventFormState = copy(targetDate = date)
 
-    fun withCategory(category: String): EventFormState = copy(selectedCategory = category)
+    fun withCategoryId(categoryId: String): EventFormState = copy(selectedCategoryId = categoryId)
 
     companion object {
         fun fromItem(item: Item): EventFormState = EventFormState(
             name = item.name,
             emoji = item.emoji,
             targetDate = item.targetDate,
-            selectedCategory = item.itemCategory
+            selectedCategoryId = item.categoryId
         )
 
         fun defaultNew(clock: Clock = Clock.systemDefaultZone()): EventFormState = EventFormState(
-            targetDate = todayAtNoon(clock)
+            targetDate = LocalDate.now(clock)
         )
     }
 }
@@ -158,13 +159,13 @@ data class EventFormState(
  * Bundle-friendly [Saver] for [EventFormState] with tolerant restore on incomplete or malformed
  * saved lists so process-death restoration falls back cleanly to defaults.
  */
-val EventFormStateSaver: Saver<EventFormState, Any> = listSaver(
+val EventFormStateSaver: Saver<EventFormState, Any> = listSaver<EventFormState, Any>(
     save = { state ->
         listOf(
             state.name,
             state.emoji,
-            state.targetDate.time,
-            state.selectedCategory
+            state.targetDate.toString(),
+            state.selectedCategoryId
         )
     },
     restore = { saved ->
@@ -173,18 +174,21 @@ val EventFormStateSaver: Saver<EventFormState, Any> = listSaver(
         val emoji = (saved.getOrNull(1) as? String)
             ?.takeIf { isSingleGrapheme(it) }
             ?: defaults.emoji
-        val targetDate = (saved.getOrNull(2) as? Number)
-            ?.toLong()
-            ?.let(::Date)
-            ?: defaults.targetDate
-        val selectedCategory = (saved.getOrNull(3) as? String)
+        val targetDate = when (val rawDate = saved.getOrNull(2)) {
+            is String -> runCatching { LocalDate.parse(rawDate) }.getOrNull()
+            is Number -> Instant.ofEpochMilli(rawDate.toLong())
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+            else -> null
+        } ?: defaults.targetDate
+        val selectedCategoryId = (saved.getOrNull(3) as? String)
             ?.takeIf { it.isNotBlank() }
-            ?: defaults.selectedCategory
+            ?: defaults.selectedCategoryId
         EventFormState(
             name = name,
             emoji = emoji,
             targetDate = targetDate,
-            selectedCategory = selectedCategory
+            selectedCategoryId = selectedCategoryId
         )
     }
 )
@@ -197,9 +201,9 @@ val EventFormStateSaver: Saver<EventFormState, Any> = listSaver(
 fun EventForm(
     title: String,
     state: EventFormState,
-    customCategories: Set<String>,
+    categories: List<Category>,
     onStateChange: (EventFormState) -> Unit,
-    onAddCustomCategory: (String) -> Unit,
+    onAddCustomCategory: suspend (String) -> Category?,
     primaryActionLabel: String,
     onPrimaryAction: () -> Unit,
     modifier: Modifier = Modifier,
@@ -208,6 +212,7 @@ fun EventForm(
     today: LocalDate = LocalDate.now()
 ) {
     val dateFormat = LocalDateFormat.current
+    val scope = rememberCoroutineScope()
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showAddCategoryDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -345,9 +350,9 @@ fun EventForm(
         Spacer(modifier = Modifier.height(16.dp))
 
         CategorySelector(
-            selectedCategory = state.selectedCategory,
-            customCategories = customCategories,
-            onCategorySelected = { category -> onStateChange(state.withCategory(category)) },
+            selectedCategoryId = state.selectedCategoryId,
+            categories = categories,
+            onCategorySelected = { categoryId -> onStateChange(state.withCategoryId(categoryId)) },
             onAddCustomClick = { showAddCategoryDialog = true },
             modifier = Modifier.fillMaxWidth()
         )
@@ -429,13 +434,25 @@ fun EventForm(
     }
 
     if (showAddCategoryDialog) {
+        val customCategoryNames = remember(categories) {
+            categories.filterNot { it.isDefault }.map { it.name }.toSet()
+        }
         InlineAddCategoryDialog(
-            customCategories = customCategories,
+            customCategories = customCategoryNames,
             onDismiss = { showAddCategoryDialog = false },
             onConfirm = { normalized ->
-                onAddCustomCategory(normalized)
-                onStateChange(state.withCategory(normalized))
-                showAddCategoryDialog = false
+                scope.launch {
+                    try {
+                        val created = onAddCustomCategory(normalized)
+                        if (created != null) {
+                            onStateChange(state.withCategoryId(created.id))
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                    }
+                    showAddCategoryDialog = false
+                }
             }
         )
     }
@@ -448,13 +465,16 @@ private fun InlineAddCategoryDialog(
     onConfirm: (String) -> Unit
 ) {
     var rawName by rememberSaveable { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
     val normalizedName = normalizeCategoryName(rawName)
     val isDuplicate = isDuplicateCategory(rawName, customCategories)
 
     AlertDialog(
         onDismissRequest = {
-            rawName = ""
-            onDismiss()
+            if (!isSubmitting) {
+                rawName = ""
+                onDismiss()
+            }
         },
         title = { Text(stringResource(R.string.category_inline_dialog_title)) },
         text = {
@@ -478,12 +498,13 @@ private fun InlineAddCategoryDialog(
             TextButton(
                 onClick = {
                     val normalized = normalizeCategoryName(rawName)
-                    if (normalized.isNotEmpty() && !isDuplicate) {
+                    if (normalized.isNotEmpty() && !isDuplicate && !isSubmitting) {
+                        isSubmitting = true
                         rawName = ""
                         onConfirm(normalized)
                     }
                 },
-                enabled = normalizedName.isNotEmpty() && !isDuplicate
+                enabled = normalizedName.isNotEmpty() && !isDuplicate && !isSubmitting
             ) {
                 Text(stringResource(R.string.common_add))
             }
@@ -493,7 +514,8 @@ private fun InlineAddCategoryDialog(
                 onClick = {
                     rawName = ""
                     onDismiss()
-                }
+                },
+                enabled = !isSubmitting
             ) {
                 Text(stringResource(R.string.common_cancel))
             }
@@ -508,10 +530,10 @@ private fun EventFormAddLightPreview() {
     SimpleDayCounterTheme(darkTheme = false) {
         EventForm(
             title = stringResource(R.string.add_event_title),
-            state = EventFormState(targetDate = localDateToNoonDate(previewDate)),
-            customCategories = emptySet(),
+            state = EventFormState(targetDate = previewDate),
+            categories = DEFAULT_CATEGORIES,
             onStateChange = {},
-            onAddCustomCategory = {},
+            onAddCustomCategory = { null },
             primaryActionLabel = stringResource(R.string.add_event_save),
             onPrimaryAction = {},
             onCancel = {},
@@ -527,10 +549,10 @@ private fun EventFormAddDarkPreview() {
     SimpleDayCounterTheme(darkTheme = true) {
         EventForm(
             title = stringResource(R.string.add_event_title),
-            state = EventFormState(targetDate = localDateToNoonDate(previewDate)),
-            customCategories = emptySet(),
+            state = EventFormState(targetDate = previewDate),
+            categories = DEFAULT_CATEGORIES,
             onStateChange = {},
-            onAddCustomCategory = {},
+            onAddCustomCategory = { null },
             primaryActionLabel = stringResource(R.string.add_event_save),
             onPrimaryAction = {},
             onCancel = {},
@@ -549,12 +571,12 @@ private fun EventFormEditLightPreview() {
             state = EventFormState(
                 name = "Summer Vacation",
                 emoji = "\u2708\uFE0F",
-                targetDate = localDateToNoonDate(previewDate.plusWeeks(1)),
-                selectedCategory = "Personal"
+                targetDate = previewDate.plusWeeks(1),
+                selectedCategoryId = DEFAULT_CATEGORY_ID
             ),
-            customCategories = setOf("Travel"),
+            categories = DEFAULT_CATEGORIES + Category(id = "travel", name = "Travel"),
             onStateChange = {},
-            onAddCustomCategory = {},
+            onAddCustomCategory = { null },
             primaryActionLabel = stringResource(R.string.edit_event_save),
             onPrimaryAction = {},
             onDelete = {},
@@ -573,12 +595,12 @@ private fun EventFormEditDarkPreview() {
             state = EventFormState(
                 name = "Summer Vacation",
                 emoji = "\u2708\uFE0F",
-                targetDate = localDateToNoonDate(previewDate.plusWeeks(1)),
-                selectedCategory = "Personal"
+                targetDate = previewDate.plusWeeks(1),
+                selectedCategoryId = DEFAULT_CATEGORY_ID
             ),
-            customCategories = setOf("Travel"),
+            categories = DEFAULT_CATEGORIES + Category(id = "travel", name = "Travel"),
             onStateChange = {},
-            onAddCustomCategory = {},
+            onAddCustomCategory = { null },
             primaryActionLabel = stringResource(R.string.edit_event_save),
             onPrimaryAction = {},
             onDelete = {},

@@ -3,6 +3,7 @@ package com.happypuppy.daycounter.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
 
 /**
  * Thin wrapper delegating Add Event sheet content to [EventForm] with hoisted form state.
@@ -10,16 +11,16 @@ import com.happypuppy.daycounter.R
 @Composable
 fun AddEventBottomSheet(
     state: EventFormState,
-    customCategories: Set<String>,
+    categories: List<Category>,
     onStateChange: (EventFormState) -> Unit,
-    onAddCustomCategory: (String) -> Unit,
+    onAddCustomCategory: suspend (String) -> Category?,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
     EventForm(
         title = stringResource(R.string.add_event_title),
         state = state,
-        customCategories = customCategories,
+        categories = categories,
         onStateChange = onStateChange,
         onAddCustomCategory = onAddCustomCategory,
         primaryActionLabel = stringResource(R.string.add_event_save),

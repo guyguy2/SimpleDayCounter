@@ -1,8 +1,12 @@
 package com.happypuppy.daycounter.ui.screens
 
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
 import java.util.Date
 
 class SortItemsTest {
@@ -10,23 +14,23 @@ class SortItemsTest {
     private val itemAlpha = Item(
         id = 1,
         name = "alpha",
-        itemCategory = "work",
+        categoryId = WORK_CATEGORY_ID,
         createdAt = Date(2_000L),
-        targetDate = Date(20_000L)
+        targetDate = LocalDate.of(2026, 6, 20)
     )
     private val itemBravo = Item(
         id = 2,
         name = "Bravo",
-        itemCategory = "Finance",
+        categoryId = FINANCE_CATEGORY_ID,
         createdAt = Date(1_000L),
-        targetDate = Date(30_000L)
+        targetDate = LocalDate.of(2026, 6, 30)
     )
     private val itemCharlie = Item(
         id = 3,
         name = "charlie",
-        itemCategory = "Personal",
+        categoryId = DEFAULT_CATEGORY_ID,
         createdAt = Date(3_000L),
-        targetDate = Date(10_000L)
+        targetDate = LocalDate.of(2026, 6, 10)
     )
 
     private val sample = listOf(itemAlpha, itemBravo, itemCharlie)
@@ -80,8 +84,20 @@ class SortItemsTest {
 
     @Test
     fun `ties preserve original relative order`() {
-        val first = Item(id = 10, name = "Same", itemCategory = "Work", createdAt = Date(1_000L), targetDate = Date(5_000L))
-        val second = Item(id = 11, name = "same", itemCategory = "work", createdAt = Date(1_000L), targetDate = Date(5_000L))
+        val first = Item(
+            id = 10,
+            name = "Same",
+            categoryId = WORK_CATEGORY_ID,
+            createdAt = Date(1_000L),
+            targetDate = LocalDate.of(2026, 6, 5)
+        )
+        val second = Item(
+            id = 11,
+            name = "same",
+            categoryId = "work",
+            createdAt = Date(1_000L),
+            targetDate = LocalDate.of(2026, 6, 5)
+        )
         val input = listOf(first, second)
 
         for (option in SortOption.entries) {

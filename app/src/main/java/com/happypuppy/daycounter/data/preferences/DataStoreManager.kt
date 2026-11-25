@@ -39,6 +39,7 @@ val THEME_KEY = stringPreferencesKey("app_theme")
 val VIBRATE_KEY = booleanPreferencesKey("vibrate_enabled")
 val DATE_FORMAT_KEY = stringPreferencesKey("date_format")
 val CUSTOM_CATEGORIES_KEY = stringSetPreferencesKey("custom_categories")
+val CATEGORIES_MIGRATED_TO_ROOM_KEY = booleanPreferencesKey("categories_migrated_to_room")
 val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
 val SORT_OPTION_KEY = stringPreferencesKey("sort_option")
 val FILTER_OPTION_KEY = stringPreferencesKey("filter_option")
@@ -99,6 +100,14 @@ interface EventListPreferences {
     suspend fun setFilterState(state: FilterState)
 }
 
+interface CategoryMigrationPreferences {
+    val customCategoriesFlow: Flow<Set<String>>
+    val categoriesMigratedToRoomFlow: Flow<Boolean>
+    suspend fun markCategoriesMigratedToRoom()
+    val filterStateFlow: Flow<FilterState>
+    suspend fun setFilterState(state: FilterState)
+}
+
 class InMemoryEventListPreferences(
     initialSort: SortOption = SortOption.DATE_ADDED_DESC,
     initialFilter: FilterState = FilterState()
@@ -122,7 +131,9 @@ class InMemoryEventListPreferences(
     }
 }
 
-class DataStoreManager(private val dataStore: DataStore<Preferences>) : EventListPreferences {
+class DataStoreManager(private val dataStore: DataStore<Preferences>) :
+    EventListPreferences,
+    CategoryMigrationPreferences {
     private fun themeOf(preferences: Preferences): AppTheme =
         AppTheme.fromString(preferences[THEME_KEY] ?: AppTheme.SYSTEM_DEFAULT.value)
 
@@ -183,10 +194,22 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) : EventLis
     }
 
     // Custom Categories
-    val customCategoriesFlow: Flow<Set<String>> = data
+    override val customCategoriesFlow: Flow<Set<String>> = data
         .map { preferences ->
             preferences[CUSTOM_CATEGORIES_KEY] ?: emptySet()
         }
+
+    override val categoriesMigratedToRoomFlow: Flow<Boolean> = data
+        .map { preferences ->
+            preferences[CATEGORIES_MIGRATED_TO_ROOM_KEY] == true
+        }
+        .distinctUntilChanged()
+
+    override suspend fun markCategoriesMigratedToRoom() {
+        dataStore.edit { settings ->
+            settings[CATEGORIES_MIGRATED_TO_ROOM_KEY] = true
+        }
+    }
 
     suspend fun addCustomCategory(category: String) {
         dataStore.edit { settings ->

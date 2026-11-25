@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.dayLabelFor
@@ -42,7 +43,8 @@ class SwipeToDeleteItemInstrumentedTest {
     private fun sampleEvent(name: String = "Flight Home"): EventUi = EventUi(
         id = 1,
         name = name,
-        category = "Personal",
+        categoryId = DEFAULT_CATEGORY_ID,
+        categoryName = "Personal",
         targetDate = LocalDate.of(2026, 6, 20),
         daysLeft = 5,
         dayLabel = dayLabelFor(5),

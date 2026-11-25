@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.dayLabelFor
@@ -28,7 +29,8 @@ class EventCardDayLabelInstrumentedTest {
         return EventUi(
             id = 1,
             name = "Sample event",
-            category = "Personal",
+            categoryId = DEFAULT_CATEGORY_ID,
+            categoryName = "Personal",
             targetDate = today.plusDays(daysFromToday.toLong()),
             daysLeft = daysFromToday,
             dayLabel = dayLabelFor(daysFromToday),

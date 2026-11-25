@@ -1,8 +1,12 @@
 package com.happypuppy.daycounter.ui.screens
 
 import app.cash.turbine.test
+import com.happypuppy.daycounter.data.database.CategoryRepository
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.util.DayLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,6 +20,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -26,20 +31,23 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.util.Date
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventViewModelTest {
 
     private lateinit var dao: FakeItemDao
+    private lateinit var categoryDao: FakeCategoryDao
     private lateinit var repository: ItemRepository
+    private lateinit var categoryRepository: CategoryRepository
     private val dispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         dao = FakeItemDao()
+        categoryDao = FakeCategoryDao(dao)
         repository = ItemRepository(dao)
+        categoryRepository = CategoryRepository(categoryDao, dao)
     }
 
     @After
@@ -47,53 +55,75 @@ class EventViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun item(id: Int, name: String = "event-$id", category: String = "Personal", emoji: String = ""): Item =
-        Item(id = id, name = name, itemCategory = category, targetDate = Date(1_700_000_000_000L), emoji = emoji)
+    private fun item(
+        id: Int,
+        name: String = "event-$id",
+        categoryId: String = DEFAULT_CATEGORY_ID,
+        emoji: String = ""
+    ): Item = Item(
+        id = id,
+        name = name,
+        categoryId = categoryId,
+        targetDate = LocalDate.of(2026, 11, 14),
+        emoji = emoji
+    )
 
     @Test
     fun `saveItem inserts new item into repository and updates uiState`() = runTest(dispatcher) {
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
-        val target = Date(1_800_000_000_000L)
-        viewModel.saveItem(name = "Vacation", category = "Personal", targetDate = target, emoji = "✈️")
+        val target = LocalDate.of(2027, 1, 15)
+        viewModel.saveItem(name = "Vacation", categoryId = DEFAULT_CATEGORY_ID, targetDate = target, emoji = "\u2708\uFE0F")
         advanceUntilIdle()
 
         val events = viewModel.uiState.value.events
         assertEquals(1, events.size)
         assertEquals("Vacation", events.first().name)
-        assertEquals("Personal", events.first().category)
-        assertEquals(
-            target.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
-            events.first().targetDate
-        )
-        assertEquals("✈️", events.first().emoji)
+        assertEquals(DEFAULT_CATEGORY_ID, events.first().categoryId)
+        assertEquals("Personal", events.first().categoryName)
+        assertEquals(target, events.first().targetDate)
+        assertEquals("\u2708\uFE0F", events.first().emoji)
         assertNull(viewModel.uiState.value.error)
     }
 
     @Test
-    fun `updateItem replaces existing item in repository`() = runTest(dispatcher) {
-        val original = item(id = 12, name = "Old Name", category = "Work", emoji = "💼")
-        dao.insertItem(original)
-        val viewModel = EventViewModel(repository)
+    fun `addCustomCategory inserts into Room and exposes in uiState categories`() = runTest(dispatcher) {
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
-        val updated = original.copy(name = "New Name", itemCategory = "Health", emoji = "🏃")
+        val created = viewModel.addCustomCategory("  travel plans ")
+        advanceUntilIdle()
+
+        assertNotNull(created)
+        assertEquals("Travel Plans", created!!.name)
+        assertTrue(viewModel.uiState.value.categories.any { it.id == created.id && it.name == "Travel Plans" })
+    }
+
+    @Test
+    fun `updateItem replaces existing item in repository`() = runTest(dispatcher) {
+        val original = item(id = 12, name = "Old Name", categoryId = WORK_CATEGORY_ID, emoji = "\uD83D\uDCBC")
+        dao.insertItem(original)
+        val viewModel = EventViewModel(repository, categoryRepository)
+        advanceUntilIdle()
+
+        val updated = original.copy(name = "New Name", categoryId = HEALTH_CATEGORY_ID, emoji = "\uD83C\uDFC3")
         viewModel.updateItem(updated)
         advanceUntilIdle()
 
         val events = viewModel.uiState.value.events
         assertEquals(1, events.size)
         assertEquals("New Name", events.first().name)
-        assertEquals("Health", events.first().category)
-        assertEquals("🏃", events.first().emoji)
+        assertEquals(HEALTH_CATEGORY_ID, events.first().categoryId)
+        assertEquals("Health", events.first().categoryName)
+        assertEquals("\uD83C\uDFC3", events.first().emoji)
     }
 
     @Test
     fun `deleteItem hides event immediately, emits Channel snackbar event, and deletes from repository`() =
         runTest(dispatcher) {
             dao.insertItem(item(1, "to-delete"))
-            val viewModel = EventViewModel(repository)
+            val viewModel = EventViewModel(repository, categoryRepository)
             advanceUntilIdle()
 
             viewModel.events.test {
@@ -112,7 +142,7 @@ class EventViewModelTest {
     @Test
     fun `undoDelete restores item, increments restoreVersion, and clears canUndo`() = runTest(dispatcher) {
         dao.insertItem(item(7, "boom"))
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
         viewModel.deleteItem(item(7, "boom"))
@@ -134,7 +164,7 @@ class EventViewModelTest {
     fun `consecutive deletes emit Channel events and undo restores in LIFO order`() = runTest(dispatcher) {
         dao.insertItem(item(10, "first"))
         dao.insertItem(item(20, "second"))
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
         viewModel.events.test {
@@ -164,7 +194,7 @@ class EventViewModelTest {
     @Test
     fun `dismissUndoSnackbar clears undo stack without touching the repository`() = runTest(dispatcher) {
         dao.insertItem(item(3, "fleeting"))
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
         viewModel.deleteItem(item(3, "fleeting"))
@@ -183,7 +213,7 @@ class EventViewModelTest {
     @Test
     fun `undoing the same id twice produces strictly increasing restoreVersion`() = runTest(dispatcher) {
         dao.insertItem(item(5, "again"))
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
         viewModel.deleteItem(item(5, "again"))
@@ -205,7 +235,7 @@ class EventViewModelTest {
     @Test
     fun `database read error propagates to uiState error and clears loading`() = runTest(dispatcher) {
         val failingDao = FakeItemDao(flowError = IOException("Disk corrupted"))
-        val viewModel = EventViewModel(ItemRepository(failingDao))
+        val viewModel = EventViewModel(ItemRepository(failingDao), categoryRepository)
         advanceUntilIdle()
 
         assertEquals(EventError.LoadFailed, viewModel.uiState.value.error)
@@ -219,11 +249,11 @@ class EventViewModelTest {
     fun `database write errors on save, update, and delete propagate to uiState error`() = runTest(dispatcher) {
         val existing = item(1, "existing")
         dao.insertItem(existing)
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
         advanceUntilIdle()
 
         dao.insertError = IOException("Insert failed")
-        viewModel.saveItem("New", "Work", Date())
+        viewModel.saveItem("New", WORK_CATEGORY_ID, LocalDate.of(2026, 6, 15))
         advanceUntilIdle()
         assertEquals(EventError.SaveFailed, viewModel.uiState.value.error)
 
@@ -237,7 +267,6 @@ class EventViewModelTest {
         viewModel.deleteItem(existing)
         advanceUntilIdle()
         assertEquals(EventError.DeleteFailed, viewModel.uiState.value.error)
-        // Failed delete restores visibility and clears undo for that item.
         assertEquals(listOf(1), viewModel.uiState.value.events.map { it.id })
         assertFalse(viewModel.uiState.value.canUndo)
     }
@@ -245,7 +274,7 @@ class EventViewModelTest {
     @Test
     fun `uiState emits initial items via Turbine`() = runTest(dispatcher) {
         dao.insertItem(item(42, "seeded"))
-        val viewModel = EventViewModel(repository)
+        val viewModel = EventViewModel(repository, categoryRepository)
 
         viewModel.uiState.test {
             advanceUntilIdle()
@@ -267,10 +296,10 @@ class EventViewModelTest {
         }
         val midnightTicks = MutableSharedFlow<LocalDate>()
 
-        val targetDate = Date.from(ZonedDateTime.of(2026, 6, 16, 12, 0, 0, 0, zone).toInstant())
-        dao.insertItem(Item(id = 1, name = "Midnight Event", itemCategory = "Work", targetDate = targetDate))
+        val targetDate = LocalDate.of(2026, 6, 16)
+        dao.insertItem(Item(id = 1, name = "Midnight Event", categoryId = WORK_CATEGORY_ID, targetDate = targetDate))
 
-        val viewModel = EventViewModel(repository, clock = fakeClock, midnightTicks = midnightTicks)
+        val viewModel = EventViewModel(repository, categoryRepository, clock = fakeClock, midnightTicks = midnightTicks)
         advanceUntilIdle()
 
         val beforeMidnight = viewModel.uiState.value.events.single()

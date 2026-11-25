@@ -20,36 +20,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 
-// Predefined default categories
-val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
-
-/** Menu sentinel for the "Add Custom..." entry; shown through a string resource, never stored. */
-private const val ADD_CUSTOM_CATEGORY_KEY = "Add Custom..."
+// Predefined default category names
+val defaultCategories = DEFAULT_CATEGORIES.map { it.name }
 
 /**
- * Stateless category selector dropdown listing default categories, sorted custom categories,
- * and an entry to trigger inline custom-category creation.
+ * Stateless category selector dropdown listing default and custom [Category] rows,
+ * plus an entry to trigger inline custom-category creation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategorySelector(
-    selectedCategory: String,
-    customCategories: Set<String>,
+    selectedCategoryId: String,
+    categories: List<Category>,
     onCategorySelected: (String) -> Unit,
     onAddCustomClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
-    // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
     val isDarkTheme = LocalIsDarkTheme.current
-
-    // Combine default and alphabetically sorted custom categories for the dropdown
-    val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER) + ADD_CUSTOM_CATEGORY_KEY
+    val resolvedCategories = categories.ifEmpty { DEFAULT_CATEGORIES }
+    val selectedCategory = remember(selectedCategoryId, resolvedCategories) {
+        resolvedCategories.find { it.id == selectedCategoryId } ?: resolvedCategories.first()
     }
 
     Column(modifier = modifier) {
@@ -73,42 +70,51 @@ fun CategorySelector(
                     )
                 },
                 leadingIcon = {
-                    // Show color indicator for the selected category
                     CategoryColorIndicator(
-                        color = CategoryColors.getCategoryColor(selectedCategory, isDarkTheme)
+                        color = CategoryColors.getCategoryColor(
+                            categoryId = selectedCategory.id,
+                            categoryName = selectedCategory.name,
+                            isDarkTheme = isDarkTheme
+                        )
                     )
                 },
                 readOnly = true
             )
 
-            // Category dropdown
             ExposedDropdownMenu(
                 expanded = showCategoryDropdown,
                 onDismissRequest = { showCategoryDropdown = false }
             ) {
-                allCategories.forEach { category ->
+                resolvedCategories.forEach { category ->
                     DropdownMenuItem(
                         leadingIcon = {
-                            if (category != ADD_CUSTOM_CATEGORY_KEY) {
-                                // Show color indicator for each category in dropdown
-                                CategoryColorIndicator(
-                                    color = CategoryColors.getCategoryColor(category, isDarkTheme)
+                            CategoryColorIndicator(
+                                color = CategoryColors.getCategoryColor(
+                                    categoryId = category.id,
+                                    categoryName = category.name,
+                                    isDarkTheme = isDarkTheme
                                 )
-                            }
+                            )
                         },
                         text = {
-                            Text(if (category == ADD_CUSTOM_CATEGORY_KEY) stringResource(R.string.category_add_custom) else categoryDisplayName(category))
+                            Text(categoryDisplayName(category))
                         },
                         onClick = {
-                            if (category == ADD_CUSTOM_CATEGORY_KEY) {
-                                onAddCustomClick()
-                            } else {
-                                onCategorySelected(category)
-                            }
+                            onCategorySelected(category.id)
                             showCategoryDropdown = false
                         }
                     )
                 }
+
+                DropdownMenuItem(
+                    text = {
+                        Text(stringResource(R.string.category_add_custom))
+                    },
+                    onClick = {
+                        onAddCustomClick()
+                        showCategoryDropdown = false
+                    }
+                )
             }
         }
     }

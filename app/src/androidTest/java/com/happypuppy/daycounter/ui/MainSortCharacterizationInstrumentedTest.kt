@@ -11,8 +11,12 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.MainActivity
 import com.happypuppy.daycounter.data.database.AppDatabase
+import com.happypuppy.daycounter.data.database.CategoryRepository
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.screens.FilterState
@@ -27,7 +31,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Date
 
 /**
@@ -69,36 +72,35 @@ class MainSortCharacterizationInstrumentedTest {
         store.setDynamicColor(false)
         store.setSortOption(SortOption.DATE_ADDED_DESC)
         store.setFilterState(FilterState())
+        koin.get<CategoryRepository>().ensureInitialized()
     }
-
-    private fun noonIn(days: Long): Date =
-        Date.from(LocalDate.now().plusDays(days).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
 
     private fun seedEvents() {
         runBlocking(Dispatchers.IO) {
+            val today = LocalDate.now()
             val repository = koin.get<ItemRepository>()
             repository.insertItem(
                 Item(
                     name = "Alpha",
-                    itemCategory = "Work",
+                    categoryId = WORK_CATEGORY_ID,
                     createdAt = Date(2_000L),
-                    targetDate = noonIn(10)
+                    targetDate = today.plusDays(10)
                 )
             )
             repository.insertItem(
                 Item(
                     name = "Bravo",
-                    itemCategory = "Finance",
+                    categoryId = FINANCE_CATEGORY_ID,
                     createdAt = Date(1_000L),
-                    targetDate = noonIn(30)
+                    targetDate = today.plusDays(30)
                 )
             )
             repository.insertItem(
                 Item(
                     name = "Charlie",
-                    itemCategory = "Personal",
+                    categoryId = DEFAULT_CATEGORY_ID,
                     createdAt = Date(3_000L),
-                    targetDate = noonIn(20)
+                    targetDate = today.plusDays(20)
                 )
             )
         }

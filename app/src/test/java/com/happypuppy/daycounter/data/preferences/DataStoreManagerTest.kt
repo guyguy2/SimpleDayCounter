@@ -209,6 +209,16 @@ class DataStoreManagerTest {
         assertEquals("vibrate_enabled", VIBRATE_KEY.name)
         assertEquals("date_format", DATE_FORMAT_KEY.name)
         assertEquals("custom_categories", CUSTOM_CATEGORIES_KEY.name)
+        assertEquals("categories_migrated_to_room", CATEGORIES_MIGRATED_TO_ROOM_KEY.name)
+    }
+
+    @Test
+    fun `categoriesMigratedToRoomFlow defaults false and marks true idempotently`() = runBlocking {
+        val manager = newManager()
+        assertFalse(manager.categoriesMigratedToRoomFlow.first())
+
+        manager.markCategoriesMigratedToRoom()
+        assertTrue(manager.categoriesMigratedToRoomFlow.first())
     }
 
     // Read errors resolve to defaults instead of failing the collector
