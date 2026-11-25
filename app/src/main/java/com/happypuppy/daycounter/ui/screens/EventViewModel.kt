@@ -9,17 +9,25 @@ import com.happypuppy.daycounter.data.database.ItemRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.LocalDate
 import java.util.Date
 import java.util.concurrent.atomic.AtomicLong
 
 data class MainScreenUiState(
-    val items: List<Item> = emptyList(),
+    val events: List<EventUi> = emptyList(),
+    val hasAnyEvents: Boolean = false,
+    val sortOption: SortOption = SortOption.DATE_ADDED_DESC,
+    val filterState: FilterState = FilterState(),
     val isLoading: Boolean = false,
     val error: EventError? = null,
     val lastDeletedItem: Item? = null,
@@ -28,15 +36,27 @@ data class MainScreenUiState(
     val restoredItemKeys: Map<Int, Long> = emptyMap()
 )
 
-class EventViewModel(private val repository: ItemRepository) : ViewModel() {
+class EventViewModel(
+    private val repository: ItemRepository,
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val midnightTicks: Flow<LocalDate> = emptyFlow()
+) : ViewModel() {
     private val _uiState = MutableStateFlow(MainScreenUiState(isLoading = true))
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
+
+    private val _rawItems = MutableStateFlow<List<Item>?>(null)
+    private val _today = MutableStateFlow(LocalDate.now(clock))
+    private val _sortOption = MutableStateFlow(SortOption.DATE_ADDED_DESC)
+    private val _filterState = MutableStateFlow(FilterState())
+    private val _restoredItemKeys = MutableStateFlow<Map<Int, Long>>(emptyMap())
 
     private val tokenGenerator = AtomicLong(0L)
     private val pendingDeleteJobs = mutableMapOf<Int, Job>()
 
     init {
         observeItems()
+        observeCombinedState()
+        observeMidnightTicks()
     }
 
     // Collect the reactive items stream once. Room emits a fresh list on every
@@ -49,9 +69,79 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                     _uiState.update { state -> state.copy(error = EventError.LoadFailed, isLoading = false) }
                 }
                 .collect { items ->
-                    _uiState.update { it.copy(items = items, isLoading = false) }
+                    _rawItems.value = items
                 }
         }
+    }
+
+    private fun observeCombinedState() {
+        viewModelScope.launch {
+            combine(
+                _rawItems,
+                _today,
+                _filterState,
+                _sortOption,
+                _restoredItemKeys
+            ) { rawItems, today, filterState, sortOption, restoredKeys ->
+                if (rawItems == null) {
+                    null
+                } else {
+                    val mapped = rawItems.map { item ->
+                        item.toEventUi(
+                            today = today,
+                            zoneId = clock.zone,
+                            restoreVersion = (restoredKeys[item.id] ?: 0L).toInt()
+                        )
+                    }
+                    CombinedEvents(
+                        events = sortEvents(filterEvents(mapped, filterState), sortOption),
+                        hasAnyEvents = rawItems.isNotEmpty(),
+                        sortOption = sortOption,
+                        filterState = filterState,
+                        restoredKeys = restoredKeys
+                    )
+                }
+            }.collect { combined ->
+                if (combined != null) {
+                    _uiState.update { current ->
+                        current.copy(
+                            events = combined.events,
+                            hasAnyEvents = combined.hasAnyEvents,
+                            sortOption = combined.sortOption,
+                            filterState = combined.filterState,
+                            restoredItemKeys = combined.restoredKeys,
+                            isLoading = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeMidnightTicks() {
+        viewModelScope.launch {
+            midnightTicks.collect { newDate ->
+                _today.value = newDate
+            }
+        }
+    }
+
+    fun refreshToday() {
+        _today.value = LocalDate.now(clock)
+    }
+
+    fun itemById(id: Int): Item? = _rawItems.value?.find { it.id == id }
+
+    fun setSortOption(option: SortOption) {
+        _sortOption.value = option
+    }
+
+    fun setFilterState(state: FilterState) {
+        _filterState.value = state
+    }
+
+    fun clearFilter() {
+        _filterState.value = FilterState()
     }
 
     fun saveItem(name: String, category: String, targetDate: Date, emoji: String = "") {
@@ -62,7 +152,7 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                         name = name,
                         itemCategory = category,
                         targetDate = targetDate,
-                        createdAt = Date(),
+                        createdAt = Date.from(clock.instant()),
                         emoji = emoji
                     )
                 )
@@ -84,6 +174,10 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
                 _uiState.update { it.copy(error = EventError.UpdateFailed) }
             }
         }
+    }
+
+    fun deleteEvent(id: Int) {
+        itemById(id)?.let(::deleteItem)
     }
 
     fun deleteItem(item: Item) {
@@ -125,11 +219,12 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
 
         // Monotonic key forces LazyColumn to remount the row so swipe state resets.
         val restorationKey = tokenGenerator.incrementAndGet()
+        _restoredItemKeys.update { it + (deletedItem.id to restorationKey) }
         _uiState.update { current ->
             current.copy(
                 lastDeletedItem = null,
                 showUndoSnackbar = false,
-                restoredItemKeys = current.restoredItemKeys + (deletedItem.id to restorationKey),
+                restoredItemKeys = _restoredItemKeys.value,
                 error = null
             )
         }
@@ -153,25 +248,27 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     }
 
     fun clearRestorationKey(itemId: Int) {
-        _uiState.update { current ->
-            if (!current.restoredItemKeys.containsKey(itemId)) {
+        _restoredItemKeys.update { current ->
+            if (!current.containsKey(itemId)) {
                 current
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Cleared restoration key for item $itemId")
-                current.copy(restoredItemKeys = current.restoredItemKeys - itemId)
+                current - itemId
             }
         }
+        _uiState.update { it.copy(restoredItemKeys = _restoredItemKeys.value) }
     }
 
     private fun removeRestorationKeyIfMatches(itemId: Int, expectedKey: Long) {
-        _uiState.update { current ->
-            if (current.restoredItemKeys[itemId] != expectedKey) {
+        _restoredItemKeys.update { current ->
+            if (current[itemId] != expectedKey) {
                 current
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Auto-expired restoration key for item $itemId")
-                current.copy(restoredItemKeys = current.restoredItemKeys - itemId)
+                current - itemId
             }
         }
+        _uiState.update { it.copy(restoredItemKeys = _restoredItemKeys.value) }
     }
 
     fun dismissUndoSnackbar() {
@@ -186,6 +283,14 @@ class EventViewModel(private val repository: ItemRepository) : ViewModel() {
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
+
+    private data class CombinedEvents(
+        val events: List<EventUi>,
+        val hasAnyEvents: Boolean,
+        val sortOption: SortOption,
+        val filterState: FilterState,
+        val restoredKeys: Map<Int, Long>
+    )
 
     companion object {
         private const val TAG = "EventViewModel"

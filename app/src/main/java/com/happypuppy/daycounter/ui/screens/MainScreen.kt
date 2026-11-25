@@ -1,5 +1,9 @@
 package com.happypuppy.daycounter.ui.screens
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -51,6 +55,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,9 +77,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
-import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
@@ -104,7 +112,6 @@ fun MainScreen(
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
     )
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
-    var selectedSortOption by rememberSaveable { mutableStateOf(SortOption.DATE_ADDED_DESC) }
 
     var showAddEventSheet by rememberSaveable { mutableStateOf(false) }
     var showEditEventSheet by rememberSaveable { mutableStateOf(false) }
@@ -112,13 +119,42 @@ fun MainScreen(
     // Save only the selected item's id; resolve the Item against the current list so the
     // edit sheet survives configuration changes and process death (IMPROVEMENTS.md F-1).
     var selectedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
-    val selectedItem = remember(uiState.items, selectedItemId) {
-        uiState.items.find { it.id == selectedItemId }
+    val selectedItem = remember(uiState.events, selectedItemId) {
+        selectedItemId?.let(viewModel::itemById)
     }
     var showFilterMenu by rememberSaveable { mutableStateOf(false) }
-
-    var filterState by rememberSaveable(stateSaver = FilterStateSaver) { mutableStateOf(FilterState()) }
     var showCategoryFilterOptions by rememberSaveable { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(context, viewModel) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                viewModel.refreshToday()
+            }
+        }
+        val intentFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            intentFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshToday()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Log orientation changes
     val configuration = LocalConfiguration.current
@@ -126,10 +162,8 @@ fun MainScreen(
         if (BuildConfig.DEBUG) Log.d("MainScreen", "Configuration changed: orientation=${configuration.orientation}")
     }
 
-    // Sort items based on selected option (case-insensitive for name/category)
-    val filteredAndSortedItems = remember(uiState.items, selectedSortOption, filterState) {
-        sortItems(filterItems(uiState.items, filterState), selectedSortOption)
-    }
+    val filterState = uiState.filterState
+    val selectedSortOption = uiState.sortOption
 
     // Get all category names (both default and custom); inject at screen root (P1-1)
     val dataStoreManager = koinInject<DataStoreManager>()
@@ -183,7 +217,7 @@ fun MainScreen(
                             showCategoryOptions = showCategoryFilterOptions,
                             filterState = filterState,
                             categories = allCategories,
-                            onSelectFilter = { filterState = it },
+                            onSelectFilter = viewModel::setFilterState,
                             onDismiss = { showFilterMenu = false },
                             onOpenCategories = { showCategoryFilterOptions = true },
                             onDismissCategories = { showCategoryFilterOptions = false }
@@ -198,7 +232,7 @@ fun MainScreen(
                         SortMenu(
                             expanded = showSortMenu,
                             selectedSortOption = selectedSortOption,
-                            onSelectOption = { selectedSortOption = it },
+                            onSelectOption = viewModel::setSortOption,
                             onDismiss = { showSortMenu = false }
                         )
                     }
@@ -277,13 +311,13 @@ fun MainScreen(
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
                         filterState = filterState,
-                        onClear = { filterState = FilterState() }
+                        onClear = viewModel::clearFilter
                     )
                 }
 
                 // Show loading, empty state, or event list
                 when {
-                    uiState.isLoading && uiState.items.isEmpty() -> {
+                    uiState.isLoading && !uiState.hasAnyEvents -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -294,7 +328,7 @@ fun MainScreen(
                         }
                     }
 
-                    filteredAndSortedItems.isEmpty() -> {
+                    uiState.events.isEmpty() -> {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -337,21 +371,18 @@ fun MainScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(
-                                items = filteredAndSortedItems,
+                                items = uiState.events,
                                 // Include restoration token so undo remounts the row
                                 // (resets swipe state).
-                                key = { item ->
-                                    val restorationKey = uiState.restoredItemKeys[item.id] ?: 0L
-                                    "${item.id}_$restorationKey"
-                                }
-                            ) { item ->
+                                key = { event -> "${event.id}_${event.restoreVersion}" }
+                            ) { event ->
                                 SwipeToDeleteItem(
-                                    item = item,
-                                    wasUndone = uiState.restoredItemKeys.containsKey(item.id),
+                                    event = event,
+                                    wasUndone = uiState.restoredItemKeys.containsKey(event.id),
                                     isVibrationEnabled = isVibrationEnabled,
-                                    onDelete = { viewModel.deleteItem(item) },
+                                    onDelete = { viewModel.deleteEvent(event.id) },
                                     onClick = {
-                                        selectedItemId = item.id
+                                        selectedItemId = event.id
                                         showEditEventSheet = true
                                     }
                                 )
@@ -421,7 +452,7 @@ internal fun MainTopBarTitle() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteItem(
-    item: Item,
+    event: EventUi,
     wasUndone: Boolean,
     isVibrationEnabled: Boolean,
     onDelete: () -> Unit,
@@ -434,7 +465,7 @@ fun SwipeToDeleteItem(
     LaunchedEffect(wasUndone) {
         if (wasUndone) {
             isRemoved = false
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Reset removal state for undone item ${item.id}")
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Reset removal state for undone item ${event.id}")
         }
     }
 
@@ -449,7 +480,7 @@ fun SwipeToDeleteItem(
             if (isVibrationEnabled) {
                 vibrate(context)
             }
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${item.id}")
+            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${event.id}")
             onDelete()
         }
     }
@@ -492,7 +523,7 @@ fun SwipeToDeleteItem(
                 }
             }
         ) {
-            EventCard(item = item, onClick = onClick, onDelete = deleteOnce)
+            EventCard(event = event, onClick = onClick, onDelete = deleteOnce)
         }
     }
 }

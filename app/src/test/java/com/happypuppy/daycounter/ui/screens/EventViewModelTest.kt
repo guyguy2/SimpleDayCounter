@@ -3,8 +3,10 @@ package com.happypuppy.daycounter.ui.screens
 import app.cash.turbine.test
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
+import com.happypuppy.daycounter.util.DayLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -21,6 +23,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.IOException
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.Date
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,12 +61,15 @@ class EventViewModelTest {
         viewModel.saveItem(name = "Vacation", category = "Personal", targetDate = target, emoji = "✈️")
         advanceUntilIdle()
 
-        val items = viewModel.uiState.value.items
-        assertEquals(1, items.size)
-        assertEquals("Vacation", items.first().name)
-        assertEquals("Personal", items.first().itemCategory)
-        assertEquals(target, items.first().targetDate)
-        assertEquals("✈️", items.first().emoji)
+        val events = viewModel.uiState.value.events
+        assertEquals(1, events.size)
+        assertEquals("Vacation", events.first().name)
+        assertEquals("Personal", events.first().category)
+        assertEquals(
+            target.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+            events.first().targetDate
+        )
+        assertEquals("✈️", events.first().emoji)
         assertNull(viewModel.uiState.value.error)
     }
 
@@ -74,11 +84,11 @@ class EventViewModelTest {
         viewModel.updateItem(updated)
         advanceUntilIdle()
 
-        val items = viewModel.uiState.value.items
-        assertEquals(1, items.size)
-        assertEquals("New Name", items.first().name)
-        assertEquals("Health", items.first().itemCategory)
-        assertEquals("🏃", items.first().emoji)
+        val events = viewModel.uiState.value.events
+        assertEquals(1, events.size)
+        assertEquals("New Name", events.first().name)
+        assertEquals("Health", events.first().category)
+        assertEquals("🏃", events.first().emoji)
     }
 
     @Test
@@ -95,12 +105,12 @@ class EventViewModelTest {
         assertNotNull("lastDeletedItem should be populated immediately", mid.lastDeletedItem)
         assertEquals(1, mid.lastDeletedItem?.id)
         assertTrue("snackbarToken should be positive", mid.snackbarToken > 0L)
-        assertEquals(1, mid.items.size)
+        assertEquals(1, mid.events.size)
 
         advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         val final = viewModel.uiState.value
-        assertTrue(final.items.isEmpty())
+        assertTrue(final.events.isEmpty())
         assertTrue("snackbar remains visible until dismissed or undone", final.showUndoSnackbar)
     }
 
@@ -123,7 +133,7 @@ class EventViewModelTest {
 
         assertEquals("item must NOT be deleted after rapid undo", 1, dao.currentItems.size)
         assertEquals(42, dao.currentItems.first().id)
-        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(1, viewModel.uiState.value.events.size)
         assertFalse(viewModel.uiState.value.showUndoSnackbar)
         assertNull(viewModel.uiState.value.lastDeletedItem)
     }
@@ -138,7 +148,7 @@ class EventViewModelTest {
         advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showUndoSnackbar)
-        assertTrue(viewModel.uiState.value.items.isEmpty())
+        assertTrue(viewModel.uiState.value.events.isEmpty())
 
         viewModel.undoDelete()
         runCurrent()
@@ -150,8 +160,8 @@ class EventViewModelTest {
             "restoredItemKeys should contain the restored item id",
             state.restoredItemKeys.containsKey(7)
         )
-        assertEquals(1, state.items.size)
-        assertEquals(7, state.items.first().id)
+        assertEquals(1, state.events.size)
+        assertEquals(7, state.events.first().id)
     }
 
     @Test
@@ -170,7 +180,7 @@ class EventViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.showUndoSnackbar)
         assertNull(state.lastDeletedItem)
-        assertTrue(state.items.isEmpty())
+        assertTrue(state.events.isEmpty())
     }
 
     @Test
@@ -195,7 +205,7 @@ class EventViewModelTest {
 
         advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
         advanceUntilIdle()
-        assertTrue("both items should be gone from the store", viewModel.uiState.value.items.isEmpty())
+        assertTrue("both items should be gone from the store", viewModel.uiState.value.events.isEmpty())
     }
 
     @Test
@@ -347,9 +357,57 @@ class EventViewModelTest {
         viewModel.uiState.test {
             advanceUntilIdle()
             val state = expectMostRecentItem()
-            assertEquals(1, state.items.size)
-            assertEquals(42, state.items.first().id)
+            assertEquals(1, state.events.size)
+            assertEquals(42, state.events.first().id)
             assertFalse(state.isLoading)
         }
+    }
+
+    @Test
+    fun `midnightTicks updates daysLeft, dayLabel, and date-based filters across midnight`() = runTest(dispatcher) {
+        val zone = ZoneId.of("UTC")
+        var currentInstant = ZonedDateTime.of(2026, 6, 15, 23, 59, 0, 0, zone).toInstant()
+        val fakeClock = object : Clock() {
+            override fun getZone(): ZoneId = zone
+            override fun withZone(zone: ZoneId): Clock = this
+            override fun instant(): Instant = currentInstant
+        }
+        val midnightTicks = MutableSharedFlow<LocalDate>()
+
+        val targetDate = Date.from(ZonedDateTime.of(2026, 6, 16, 12, 0, 0, 0, zone).toInstant())
+        dao.insertItem(Item(id = 1, name = "Midnight Event", itemCategory = "Work", targetDate = targetDate))
+
+        val viewModel = EventViewModel(repository, clock = fakeClock, midnightTicks = midnightTicks)
+        advanceUntilIdle()
+
+        val beforeMidnight = viewModel.uiState.value.events.single()
+        assertEquals(1, beforeMidnight.daysLeft)
+        assertEquals(DayLabel.Left(1), beforeMidnight.dayLabel)
+
+        viewModel.setFilterState(FilterState(FilterOption.FUTURE))
+        assertEquals(1, viewModel.uiState.value.events.size)
+        viewModel.setFilterState(FilterState(FilterOption.TODAY))
+        assertTrue(viewModel.uiState.value.events.isEmpty())
+
+        // Cross into 2026-06-16 via midnightTicks.
+        currentInstant = ZonedDateTime.of(2026, 6, 16, 0, 0, 1, 0, zone).toInstant()
+        midnightTicks.emit(LocalDate.of(2026, 6, 16))
+        runCurrent()
+
+        assertEquals(1, viewModel.uiState.value.events.size)
+        val onTargetDay = viewModel.uiState.value.events.single()
+        assertEquals(0, onTargetDay.daysLeft)
+        assertEquals(DayLabel.Today, onTargetDay.dayLabel)
+
+        // Cross into 2026-06-17 via refreshToday().
+        currentInstant = ZonedDateTime.of(2026, 6, 17, 9, 0, 0, 0, zone).toInstant()
+        viewModel.refreshToday()
+        runCurrent()
+
+        assertTrue(viewModel.uiState.value.events.isEmpty())
+        viewModel.setFilterState(FilterState(FilterOption.PAST))
+        val pastEvent = viewModel.uiState.value.events.single()
+        assertEquals(-1, pastEvent.daysLeft)
+        assertEquals(DayLabel.Past(1), pastEvent.dayLabel)
     }
 }

@@ -11,17 +11,17 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.happypuppy.daycounter.R
+import java.io.IOException
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.io.IOException
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // DataStore for preferences
 const val SETTINGS_DATASTORE_NAME = "settings"
@@ -176,10 +176,15 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
  * Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). [DateFormat.SYSTEM] uses
  * the locale's own medium date style; every other option is a fixed pattern with locale month names.
  */
+fun formatDate(date: LocalDate, format: DateFormat, locale: Locale = Locale.getDefault()): String {
+    val formatter = when (val pattern = format.formatPattern) {
+        null -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+        else -> DateTimeFormatter.ofPattern(pattern, locale)
+    }
+    return formatter.format(date)
+}
+
 fun formatDate(date: Date, format: DateFormat, locale: Locale = Locale.getDefault()): String {
-    val pattern = format.formatPattern
-        ?: return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-            .withLocale(locale)
-            .format(date.toInstant().atZone(ZoneId.systemDefault()))
-    return SimpleDateFormat(pattern, locale).format(date)
+    val localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    return formatDate(localDate, format, locale)
 }

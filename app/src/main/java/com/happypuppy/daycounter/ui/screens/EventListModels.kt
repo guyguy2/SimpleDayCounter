@@ -5,7 +5,44 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.calculateDaysLeft
+import com.happypuppy.daycounter.util.dayLabelFor
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+
+data class EventUi(
+    val id: Int,
+    val name: String,
+    val category: String,
+    val targetDate: LocalDate,
+    val daysLeft: Int,
+    val dayLabel: DayLabel,
+    val emoji: String,
+    val createdAtMillis: Long,
+    val restoreVersion: Int = 0
+)
+
+fun Item.toEventUi(
+    today: LocalDate,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    restoreVersion: Int = 0
+): EventUi {
+    val targetLocalDate = targetDate.toInstant().atZone(zoneId).toLocalDate()
+    val daysLeft = ChronoUnit.DAYS.between(today, targetLocalDate).toInt()
+    return EventUi(
+        id = id,
+        name = name,
+        category = itemCategory,
+        targetDate = targetLocalDate,
+        daysLeft = daysLeft,
+        dayLabel = dayLabelFor(daysLeft),
+        emoji = emoji,
+        createdAtMillis = createdAt.time,
+        restoreVersion = restoreVersion
+    )
+}
 
 enum class SortOption(@StringRes val labelRes: Int) {
     NAME_ASC(R.string.main_sort_name_asc),
@@ -77,5 +114,30 @@ fun sortItems(items: List<Item>, option: SortOption): List<Item> {
         SortOption.DATE_ADDED_DESC -> items.sortedByDescending { it.createdAt }
         SortOption.CATEGORY_ASC -> items.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
         SortOption.CATEGORY_DESC -> items.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
+    }
+}
+
+fun filterEvents(events: List<EventUi>, filterState: FilterState): List<EventUi> {
+    return when (filterState.option) {
+        FilterOption.ALL -> events
+        FilterOption.FUTURE -> events.filter { it.daysLeft > 0 }
+        FilterOption.TODAY -> events.filter { it.daysLeft == 0 }
+        FilterOption.PAST -> events.filter { it.daysLeft < 0 }
+        FilterOption.CATEGORY -> filterState.category?.let { category ->
+            events.filter { it.category == category }
+        } ?: events
+    }
+}
+
+fun sortEvents(events: List<EventUi>, option: SortOption): List<EventUi> {
+    return when (option) {
+        SortOption.NAME_ASC -> events.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        SortOption.NAME_DESC -> events.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.name })
+        SortOption.TARGET_DATE_ASC -> events.sortedBy { it.targetDate }
+        SortOption.TARGET_DATE_DESC -> events.sortedByDescending { it.targetDate }
+        SortOption.DATE_ADDED_ASC -> events.sortedBy { it.createdAtMillis }
+        SortOption.DATE_ADDED_DESC -> events.sortedByDescending { it.createdAtMillis }
+        SortOption.CATEGORY_ASC -> events.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.category })
+        SortOption.CATEGORY_DESC -> events.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.category })
     }
 }

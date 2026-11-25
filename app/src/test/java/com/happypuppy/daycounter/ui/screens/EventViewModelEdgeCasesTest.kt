@@ -79,7 +79,7 @@ class EventViewModelEdgeCasesTest {
         advanceUntilIdle()
 
         assertEquals(listOf(original), dao.currentItems)
-        assertEquals(listOf(original), viewModel.uiState.value.items)
+        assertEquals(listOf(original.id), viewModel.uiState.value.events.map { it.id })
     }
 
     @Test
@@ -162,7 +162,7 @@ class EventViewModelEdgeCasesTest {
 
         val state = viewModel.uiState.value
         assertEquals(EventError.RestoreFailed, state.error)
-        assertTrue(state.items.isEmpty())
+        assertTrue(state.events.isEmpty())
         // Characterization: the undo slot is consumed even though the restore failed, so the user
         // cannot retry. A hardening wave should keep lastDeletedItem until the insert succeeds.
         assertNull(state.lastDeletedItem)
@@ -185,7 +185,7 @@ class EventViewModelEdgeCasesTest {
         assertEquals(token, state.snackbarToken)
         assertEquals(1, state.lastDeletedItem?.id)
         assertTrue(state.showUndoSnackbar)
-        assertEquals(listOf("new"), state.items.map { it.name })
+        assertEquals(listOf("new"), state.events.map { it.name })
     }
 
     @Test
@@ -197,7 +197,7 @@ class EventViewModelEdgeCasesTest {
         viewModel.saveItem("two", "Work", Date(2L))
         advanceUntilIdle()
 
-        val ids = viewModel.uiState.value.items.map { it.id }
+        val ids = viewModel.uiState.value.events.map { it.id }
         assertEquals(2, ids.size)
         assertEquals(2, ids.toSet().size)
         assertTrue(ids.none { it == 0 })
