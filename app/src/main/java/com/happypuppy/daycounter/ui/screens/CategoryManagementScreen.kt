@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -53,6 +54,7 @@ import com.happypuppy.daycounter.ui.components.AddCategoryInput
 import com.happypuppy.daycounter.ui.components.CategoryColorIndicator
 import com.happypuppy.daycounter.ui.components.categoryDisplayName
 import com.happypuppy.daycounter.ui.components.defaultCategories
+import com.happypuppy.daycounter.ui.layout.ADAPTIVE_CONTENT_MAX_WIDTH
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import kotlinx.coroutines.launch
@@ -96,13 +98,20 @@ fun CategoryManagementScreen(onBack: () -> Unit) {
     ) { innerPadding ->
         val layoutDirection = LocalLayoutDirection.current
         if (isLandscape) {
-            // Landscape layout (two columns)
-            Row(
+            // Landscape layout (two columns, centered and width-capped on tablets)
+            Box(
                 modifier = Modifier
-                    .padding(innerPadding)
-                    .padding(16.dp)
                     .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.TopCenter
             ) {
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(16.dp)
+                ) {
                 // Left column: Default categories
                 Column(
                     modifier = Modifier
@@ -210,10 +219,10 @@ fun CategoryManagementScreen(onBack: () -> Unit) {
                     }
                 }
             }
+            }
         } else {
-            // Portrait layout: single LazyColumn so neither default nor custom categories get clipped.
-            LazyColumn(
-                state = portraitListState,
+            // Portrait layout: single LazyColumn centered and width-capped on wide portrait screens.
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -221,13 +230,21 @@ fun CategoryManagementScreen(onBack: () -> Unit) {
                         start = innerPadding.calculateStartPadding(layoutDirection),
                         end = innerPadding.calculateEndPadding(layoutDirection)
                     ),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 16.dp,
-                    bottom = innerPadding.calculateBottomPadding() + 16.dp
-                )
+                contentAlignment = Alignment.TopCenter
             ) {
+                LazyColumn(
+                    state = portraitListState,
+                    modifier = Modifier
+                        .widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
+                        .fillMaxWidth()
+                        .fillMaxHeight(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = innerPadding.calculateBottomPadding() + 16.dp
+                    )
+                ) {
                 if (showAddCategoryInput) {
                     item(key = "add_category_input") {
                         AddCategoryInput(
@@ -310,6 +327,7 @@ fun CategoryManagementScreen(onBack: () -> Unit) {
                         )
                     }
                 }
+            }
             }
         }
     }
