@@ -5,11 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.FilterList
@@ -47,13 +41,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,8 +56,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -85,12 +74,12 @@ import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
-import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.FilterMenu
 import com.happypuppy.daycounter.ui.components.SortMenu
+import com.happypuppy.daycounter.ui.components.SwipeToDeleteItem
 import com.happypuppy.daycounter.ui.components.defaultCategories
-import com.happypuppy.daycounter.util.vibrate
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -174,20 +163,25 @@ fun MainScreen(
         defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER)
     }
 
-    // Show undo snackbar whenever a new delete event occurs (keyed on monotonic token so
-    // consecutive deletes replace the previous snackbar cleanly).
+    // Show undo snackbar for one-shot delete/undo Channel events. collectLatest cancels any
+    // superseded snackbar with CancellationException so SnackbarResult.Dismissed only runs
+    // on real timeout/dismissal, preserving the multi-undo stack across consecutive deletes.
     val resources = LocalResources.current
-    LaunchedEffect(uiState.snackbarToken) {
-        val deletedItem = uiState.lastDeletedItem
-        if (uiState.showUndoSnackbar && deletedItem != null) {
-            val result = snackbarHostState.showSnackbar(
-                message = resources.getString(R.string.main_event_deleted, deletedItem.name),
-                actionLabel = resources.getString(R.string.main_undo),
-                duration = SnackbarDuration.Long
-            )
-            when (result) {
-                SnackbarResult.ActionPerformed -> viewModel.undoDelete()
-                SnackbarResult.Dismissed -> viewModel.dismissUndoSnackbar()
+    LaunchedEffect(viewModel, snackbarHostState, resources) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is MainUiEvent.ShowUndoSnackbar -> {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val result = snackbarHostState.showSnackbar(
+                        message = resources.getString(R.string.main_event_deleted, event.itemName),
+                        actionLabel = resources.getString(R.string.main_undo),
+                        duration = SnackbarDuration.Long
+                    )
+                    when (result) {
+                        SnackbarResult.ActionPerformed -> viewModel.undoDelete()
+                        SnackbarResult.Dismissed -> viewModel.dismissUndoSnackbar()
+                    }
+                }
             }
         }
     }
@@ -378,7 +372,6 @@ fun MainScreen(
                             ) { event ->
                                 SwipeToDeleteItem(
                                     event = event,
-                                    wasUndone = uiState.restoredItemKeys.containsKey(event.id),
                                     isVibrationEnabled = isVibrationEnabled,
                                     onDelete = { viewModel.deleteEvent(event.id) },
                                     onClick = {
@@ -447,83 +440,4 @@ internal fun MainTopBarTitle() {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SwipeToDeleteItem(
-    event: EventUi,
-    wasUndone: Boolean,
-    isVibrationEnabled: Boolean,
-    onDelete: () -> Unit,
-    onClick: () -> Unit
-) {
-    val context = LocalContext.current
-    var isRemoved by remember { mutableStateOf(false) }
-
-    // Reset isRemoved if this item was just restored via undo
-    LaunchedEffect(wasUndone) {
-        if (wasUndone) {
-            isRemoved = false
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Reset removal state for undone item ${event.id}")
-        }
-    }
-
-    val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { it * 0.5f }
-    )
-
-    // Shared by the swipe gesture and the card's "Delete" accessibility action.
-    val deleteOnce = {
-        if (!isRemoved) {
-            isRemoved = true
-            if (isVibrationEnabled) {
-                vibrate(context)
-            }
-            if (BuildConfig.DEBUG) Log.d("SwipeDelete", "Executing onDelete for item ${event.id}")
-            onDelete()
-        }
-    }
-
-    AnimatedVisibility(
-        visible = !isRemoved,
-        enter = fadeIn(),
-        exit = fadeOut()
-    ) {
-        SwipeToDismissBox(
-            state = dismissState,
-            onDismiss = { value ->
-                if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
-                    deleteOnce()
-                }
-            },
-            backgroundContent = {
-                val color by animateColorAsState(
-                    targetValue = when (dismissState.targetValue) {
-                        SwipeToDismissBoxValue.Settled -> Color.Transparent
-                        SwipeToDismissBoxValue.StartToEnd,
-                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
-                    },
-                    label = "SwipeDeleteBackground"
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(color),
-                    contentAlignment = if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd)
-                        Alignment.CenterStart else Alignment.CenterEnd
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.common_delete),
-                        tint = MaterialTheme.colorScheme.onError,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-            }
-        ) {
-            EventCard(event = event, onClick = onClick, onDelete = deleteOnce)
-        }
-    }
 }

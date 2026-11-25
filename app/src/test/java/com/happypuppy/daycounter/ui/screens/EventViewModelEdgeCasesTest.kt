@@ -1,11 +1,11 @@
 package com.happypuppy.daycounter.ui.screens
 
+import app.cash.turbine.test
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -23,9 +23,7 @@ import java.io.IOException
 import java.util.Date
 
 /**
- * Edge cases around [EventViewModel] that [EventViewModelTest] does not cover. Several of these
- * characterize CURRENT behavior (single-slot undo, restore failure) so refactors that change the
- * delete/undo model are forced to update them deliberately.
+ * Edge cases around [EventViewModel], including LIFO multi-undo and retryable failed restores.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventViewModelEdgeCasesTest {
@@ -64,15 +62,14 @@ class EventViewModelEdgeCasesTest {
     }
 
     @Test
-    fun `undoDelete after the delete was committed re-inserts the same id and fields`() = runTest(dispatcher) {
+    fun `undoDelete after delete re-inserts the same id and fields`() = runTest(dispatcher) {
         val original = item(5, "Anniversary", category = "Work").copy(emoji = "\u2764\uFE0F")
         dao.insertItem(original)
         val viewModel = EventViewModel(repository)
         advanceUntilIdle()
 
         viewModel.deleteItem(original)
-        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
-        runCurrent()
+        advanceUntilIdle()
         assertTrue("delete must be committed before undo", dao.currentItems.isEmpty())
 
         viewModel.undoDelete()
@@ -83,7 +80,7 @@ class EventViewModelEdgeCasesTest {
     }
 
     @Test
-    fun `single-slot undo - after deleting A then B only B can be restored and A stays deleted`() =
+    fun `multi-undo - deleting A then B restores B then A and re-emits snackbar for A`() =
         runTest(dispatcher) {
             val a = item(1, "A")
             val b = item(2, "B")
@@ -92,42 +89,43 @@ class EventViewModelEdgeCasesTest {
             val viewModel = EventViewModel(repository)
             advanceUntilIdle()
 
-            viewModel.deleteItem(a)
-            viewModel.deleteItem(b)
-            advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
-            runCurrent()
-            assertTrue(dao.currentItems.isEmpty())
+            viewModel.events.test {
+                viewModel.deleteItem(a)
+                viewModel.deleteItem(b)
+                advanceUntilIdle()
+                assertEquals(MainUiEvent.ShowUndoSnackbar("A"), awaitItem())
+                assertEquals(MainUiEvent.ShowUndoSnackbar("B"), awaitItem())
+                assertTrue(dao.currentItems.isEmpty())
 
-            viewModel.undoDelete()
-            advanceUntilIdle()
+                viewModel.undoDelete()
+                advanceUntilIdle()
+                assertEquals(listOf(2), dao.currentItems.map { it.id })
+                assertEquals(MainUiEvent.ShowUndoSnackbar("A"), awaitItem())
 
-            assertEquals(
-                "only the most recent delete is undoable (known limitation, see PLAN.md)",
-                listOf(2),
-                dao.currentItems.map { it.id }
-            )
-            // A second undo has nothing left to restore.
-            viewModel.undoDelete()
-            advanceUntilIdle()
-            assertEquals(listOf(2), dao.currentItems.map { it.id })
+                viewModel.undoDelete()
+                advanceUntilIdle()
+                assertEquals(setOf(1, 2), dao.currentItems.map { it.id }.toSet())
+                expectNoEvents()
+            }
         }
 
     @Test
-    fun `deleting the same item twice keeps a single pending job and a single removal`() = runTest(dispatcher) {
+    fun `deleting the same item twice while pending ignores the duplicate`() = runTest(dispatcher) {
         val target = item(9, "twice")
         dao.insertItem(target)
         val viewModel = EventViewModel(repository)
         advanceUntilIdle()
 
-        viewModel.deleteItem(target)
-        val firstToken = viewModel.uiState.value.snackbarToken
-        viewModel.deleteItem(target)
-        val secondToken = viewModel.uiState.value.snackbarToken
-        advanceUntilIdle()
+        viewModel.events.test {
+            viewModel.deleteItem(target)
+            viewModel.deleteItem(target)
+            advanceUntilIdle()
 
-        assertTrue(secondToken > firstToken)
-        assertTrue(dao.currentItems.isEmpty())
-        assertNull(viewModel.uiState.value.error)
+            assertEquals(MainUiEvent.ShowUndoSnackbar("twice"), awaitItem())
+            expectNoEvents()
+            assertTrue(dao.currentItems.isEmpty())
+            assertNull(viewModel.uiState.value.error)
+        }
     }
 
     @Test
@@ -147,27 +145,34 @@ class EventViewModelEdgeCasesTest {
     }
 
     @Test
-    fun `failed restore surfaces an error and leaves the item deleted`() = runTest(dispatcher) {
-        val target = item(3, "unlucky")
-        dao.insertItem(target)
-        val viewModel = EventViewModel(repository)
-        advanceUntilIdle()
-        viewModel.deleteItem(target)
-        advanceTimeBy(EventViewModel.DELETE_DELAY_MS + 50L)
-        runCurrent()
+    fun `failed restore surfaces RestoreFailed, keeps item on undo stack, and succeeds on retry`() =
+        runTest(dispatcher) {
+            val target = item(3, "unlucky")
+            dao.insertItem(target)
+            val viewModel = EventViewModel(repository)
+            advanceUntilIdle()
+            viewModel.deleteItem(target)
+            advanceUntilIdle()
 
-        dao.insertError = IOException("restore failed")
-        viewModel.undoDelete()
-        advanceUntilIdle()
+            dao.insertError = IOException("restore failed")
+            viewModel.undoDelete()
+            advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertEquals(EventError.RestoreFailed, state.error)
-        assertTrue(state.events.isEmpty())
-        // Characterization: the undo slot is consumed even though the restore failed, so the user
-        // cannot retry. A hardening wave should keep lastDeletedItem until the insert succeeds.
-        assertNull(state.lastDeletedItem)
-        assertFalse(state.showUndoSnackbar)
-    }
+            val failedState = viewModel.uiState.value
+            assertEquals(EventError.RestoreFailed, failedState.error)
+            assertTrue(failedState.events.isEmpty())
+            assertTrue("failed restore must keep undo slot for retry", failedState.canUndo)
+
+            // Retry once the transient DB error clears.
+            dao.insertError = null
+            viewModel.undoDelete()
+            advanceUntilIdle()
+
+            val recoveredState = viewModel.uiState.value
+            assertNull(recoveredState.error)
+            assertEquals(listOf(3), recoveredState.events.map { it.id })
+            assertFalse(recoveredState.canUndo)
+        }
 
     @Test
     fun `saveItem does not touch undo state`() = runTest(dispatcher) {
@@ -175,16 +180,13 @@ class EventViewModelEdgeCasesTest {
         val viewModel = EventViewModel(repository)
         advanceUntilIdle()
         viewModel.deleteItem(item(1))
-        runCurrent()
-        val token = viewModel.uiState.value.snackbarToken
+        advanceUntilIdle()
 
         viewModel.saveItem("new", "Health", Date())
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(token, state.snackbarToken)
-        assertEquals(1, state.lastDeletedItem?.id)
-        assertTrue(state.showUndoSnackbar)
+        assertTrue(state.canUndo)
         assertEquals(listOf("new"), state.events.map { it.name })
     }
 

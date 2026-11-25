@@ -1,16 +1,13 @@
 package com.happypuppy.daycounter.ui.screens
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.EventListPreferences
 import com.happypuppy.daycounter.data.preferences.InMemoryEventListPreferences
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,12 +15,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.LocalDate
 import java.util.Date
-import java.util.concurrent.atomic.AtomicLong
+
+sealed interface MainUiEvent {
+    data class ShowUndoSnackbar(val itemName: String) : MainUiEvent
+}
 
 data class MainScreenUiState(
     val events: List<EventUi> = emptyList(),
@@ -32,10 +35,7 @@ data class MainScreenUiState(
     val filterState: FilterState = FilterState(),
     val isLoading: Boolean = false,
     val error: EventError? = null,
-    val lastDeletedItem: Item? = null,
-    val showUndoSnackbar: Boolean = false,
-    val snackbarToken: Long = 0L,
-    val restoredItemKeys: Map<Int, Long> = emptyMap()
+    val canUndo: Boolean = false
 )
 
 class EventViewModel(
@@ -47,12 +47,15 @@ class EventViewModel(
     private val _uiState = MutableStateFlow(MainScreenUiState(isLoading = true))
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
+    private val _events = Channel<MainUiEvent>(Channel.BUFFERED)
+    val events: Flow<MainUiEvent> = _events.receiveAsFlow()
+
     private val _rawItems = MutableStateFlow<List<Item>?>(null)
     private val _today = MutableStateFlow(LocalDate.now(clock))
-    private val _restoredItemKeys = MutableStateFlow<Map<Int, Long>>(emptyMap())
+    private val _undoOverlay = MutableStateFlow(UndoUiOverlay())
 
-    private val tokenGenerator = AtomicLong(0L)
-    private val pendingDeleteJobs = mutableMapOf<Int, Job>()
+    private val undoStack = ArrayDeque<Item>()
+    private val dbMutex = Mutex()
 
     init {
         observeItems()
@@ -70,6 +73,15 @@ class EventViewModel(
                     _uiState.update { state -> state.copy(error = EventError.LoadFailed, isLoading = false) }
                 }
                 .collect { items ->
+                    val presentIds = items.mapTo(mutableSetOf()) { it.id }
+                    _undoOverlay.update { overlay ->
+                        val pruned = overlay.pendingDeletedIds.intersect(presentIds)
+                        if (pruned == overlay.pendingDeletedIds) {
+                            overlay
+                        } else {
+                            overlay.copy(pendingDeletedIds = pruned)
+                        }
+                    }
                     _rawItems.value = items
                 }
         }
@@ -82,24 +94,25 @@ class EventViewModel(
                 _today,
                 listPreferences.filterStateFlow,
                 listPreferences.sortOptionFlow,
-                _restoredItemKeys
-            ) { rawItems, today, filterState, sortOption, restoredKeys ->
+                _undoOverlay
+            ) { rawItems, today, filterState, sortOption, overlay ->
                 if (rawItems == null) {
                     null
                 } else {
-                    val mapped = rawItems.map { item ->
+                    val visibleItems = rawItems.filterNot { it.id in overlay.pendingDeletedIds }
+                    val mapped = visibleItems.map { item ->
                         item.toEventUi(
                             today = today,
                             zoneId = clock.zone,
-                            restoreVersion = (restoredKeys[item.id] ?: 0L).toInt()
+                            restoreVersion = overlay.restoreVersions[item.id] ?: 0
                         )
                     }
                     CombinedEvents(
                         events = sortEvents(filterEvents(mapped, filterState), sortOption),
-                        hasAnyEvents = rawItems.isNotEmpty(),
+                        hasAnyEvents = visibleItems.isNotEmpty(),
                         sortOption = sortOption,
                         filterState = filterState,
-                        restoredKeys = restoredKeys
+                        canUndo = overlay.canUndo
                     )
                 }
             }.collect { combined ->
@@ -110,7 +123,7 @@ class EventViewModel(
                             hasAnyEvents = combined.hasAnyEvents,
                             sortOption = combined.sortOption,
                             filterState = combined.filterState,
-                            restoredItemKeys = combined.restoredKeys,
+                            canUndo = combined.canUndo,
                             isLoading = false
                         )
                     }
@@ -131,7 +144,8 @@ class EventViewModel(
         _today.value = LocalDate.now(clock)
     }
 
-    fun itemById(id: Int): Item? = _rawItems.value?.find { it.id == id }
+    fun itemById(id: Int): Item? =
+        _rawItems.value?.find { it.id == id && it.id !in _undoOverlay.value.pendingDeletedIds }
 
     fun setSortOption(option: SortOption) {
         viewModelScope.launch { listPreferences.setSortOption(option) }
@@ -182,124 +196,89 @@ class EventViewModel(
     }
 
     fun deleteItem(item: Item) {
-        pendingDeleteJobs.remove(item.id)?.cancel()
-        val token = tokenGenerator.incrementAndGet()
-        if (BuildConfig.DEBUG) Log.d(TAG, "Deleting item ${item.id} (token=$token)")
+        if (item.id in _undoOverlay.value.pendingDeletedIds) return
+        if (_rawItems.value?.none { it.id == item.id } == true) return
 
-        _uiState.update {
-            it.copy(
-                lastDeletedItem = item,
-                showUndoSnackbar = true,
-                snackbarToken = token,
-                error = null
+        undoStack.addLast(item)
+        _undoOverlay.update { overlay ->
+            overlay.copy(
+                pendingDeletedIds = overlay.pendingDeletedIds + item.id,
+                canUndo = true
             )
         }
+        _uiState.update { it.copy(error = null) }
+        _events.trySend(MainUiEvent.ShowUndoSnackbar(item.name))
 
-        val job = viewModelScope.launch {
-            delay(DELETE_DELAY_MS)
-            try {
-                repository.deleteItem(item)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Item ${item.id} deleted from repository")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _uiState.update { it.copy(error = EventError.DeleteFailed) }
-            } finally {
-                pendingDeleteJobs.remove(item.id)
+        viewModelScope.launch {
+            dbMutex.withLock {
+                try {
+                    repository.deleteItem(item)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    undoStack.remove(item)
+                    _undoOverlay.update { overlay ->
+                        overlay.copy(
+                            pendingDeletedIds = overlay.pendingDeletedIds - item.id,
+                            canUndo = undoStack.isNotEmpty()
+                        )
+                    }
+                    _uiState.update { it.copy(error = EventError.DeleteFailed) }
+                }
             }
         }
-        pendingDeleteJobs[item.id] = job
     }
 
     fun undoDelete() {
-        val deletedItem = _uiState.value.lastDeletedItem ?: return
-        // Cancel any in-flight delayed delete for this item so it cannot delete after restore.
-        pendingDeleteJobs.remove(deletedItem.id)?.cancel()
-
-        if (BuildConfig.DEBUG) Log.d(TAG, "Undoing delete for item ${deletedItem.id}")
-
-        // Monotonic key forces LazyColumn to remount the row so swipe state resets.
-        val restorationKey = tokenGenerator.incrementAndGet()
-        _restoredItemKeys.update { it + (deletedItem.id to restorationKey) }
-        _uiState.update { current ->
-            current.copy(
-                lastDeletedItem = null,
-                showUndoSnackbar = false,
-                restoredItemKeys = _restoredItemKeys.value,
-                error = null
-            )
-        }
+        if (undoStack.isEmpty()) return
 
         viewModelScope.launch {
-            try {
-                repository.insertItem(deletedItem)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _uiState.update { it.copy(error = EventError.RestoreFailed) }
-                return@launch
-            }
-
-            // Auto-expire so the map does not grow for the process lifetime.
-            // Only remove if this exact key is still present (a later undo of the
-            // same id would have replaced it with a newer token).
-            delay(RESTORATION_KEY_TTL_MS)
-            removeRestorationKeyIfMatches(deletedItem.id, restorationKey)
-        }
-    }
-
-    fun clearRestorationKey(itemId: Int) {
-        _restoredItemKeys.update { current ->
-            if (!current.containsKey(itemId)) {
-                current
-            } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Cleared restoration key for item $itemId")
-                current - itemId
+            dbMutex.withLock {
+                val item = undoStack.lastOrNull() ?: return@withLock
+                try {
+                    repository.insertItem(item)
+                    undoStack.removeLast()
+                    _undoOverlay.update { overlay ->
+                        val nextVersion = (overlay.restoreVersions[item.id] ?: 0) + 1
+                        overlay.copy(
+                            pendingDeletedIds = overlay.pendingDeletedIds - item.id,
+                            restoreVersions = overlay.restoreVersions + (item.id to nextVersion),
+                            canUndo = undoStack.isNotEmpty()
+                        )
+                    }
+                    _uiState.update { it.copy(error = null) }
+                    undoStack.lastOrNull()?.let { previous ->
+                        _events.trySend(MainUiEvent.ShowUndoSnackbar(previous.name))
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    _uiState.update { it.copy(error = EventError.RestoreFailed) }
+                }
             }
         }
-        _uiState.update { it.copy(restoredItemKeys = _restoredItemKeys.value) }
-    }
-
-    private fun removeRestorationKeyIfMatches(itemId: Int, expectedKey: Long) {
-        _restoredItemKeys.update { current ->
-            if (current[itemId] != expectedKey) {
-                current
-            } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Auto-expired restoration key for item $itemId")
-                current - itemId
-            }
-        }
-        _uiState.update { it.copy(restoredItemKeys = _restoredItemKeys.value) }
     }
 
     fun dismissUndoSnackbar() {
-        _uiState.update {
-            it.copy(
-                showUndoSnackbar = false,
-                lastDeletedItem = null
-            )
-        }
+        undoStack.clear()
+        _undoOverlay.update { it.copy(canUndo = false) }
     }
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
 
+    private data class UndoUiOverlay(
+        val pendingDeletedIds: Set<Int> = emptySet(),
+        val restoreVersions: Map<Int, Int> = emptyMap(),
+        val canUndo: Boolean = false
+    )
+
     private data class CombinedEvents(
         val events: List<EventUi>,
         val hasAnyEvents: Boolean,
         val sortOption: SortOption,
         val filterState: FilterState,
-        val restoredKeys: Map<Int, Long>
+        val canUndo: Boolean
     )
-
-    companion object {
-        private const val TAG = "EventViewModel"
-
-        /** Delay before committing delete to Room so the swipe-out animation completes. */
-        const val DELETE_DELAY_MS = 200L
-
-        /** How long a restoration key stays in uiState after undo (for LazyColumn re-key). */
-        const val RESTORATION_KEY_TTL_MS = 300L
-    }
 }
