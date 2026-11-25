@@ -36,6 +36,8 @@ import com.happypuppy.daycounter.MainActivity
 import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.ui.screens.FilterState
+import com.happypuppy.daycounter.ui.screens.SortOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
@@ -81,6 +83,8 @@ class MainFlowInstrumentedTest {
         store.clearCustomCategories()
         store.setTheme(AppTheme.SYSTEM_DEFAULT)
         store.setDynamicColor(false)
+        store.setSortOption(SortOption.DATE_ADDED_DESC)
+        store.setFilterState(FilterState())
     }
 
     /**

@@ -15,6 +15,8 @@ import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.ui.screens.FilterState
+import com.happypuppy.daycounter.ui.screens.SortOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -65,6 +67,8 @@ class MainSortCharacterizationInstrumentedTest {
         store.clearCustomCategories()
         store.setTheme(AppTheme.SYSTEM_DEFAULT)
         store.setDynamicColor(false)
+        store.setSortOption(SortOption.DATE_ADDED_DESC)
+        store.setFilterState(FilterState())
     }
 
     private fun noonIn(days: Long): Date =

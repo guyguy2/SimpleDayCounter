@@ -4,6 +4,7 @@ import androidx.room.Room
 import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.data.preferences.EventListPreferences
 import com.happypuppy.daycounter.data.preferences.dataStore
 import com.happypuppy.daycounter.ui.screens.EventViewModel
 import com.happypuppy.daycounter.util.midnightDateFlow
@@ -40,10 +41,12 @@ val appModule = module {
     viewModel {
         EventViewModel(
             repository = get(),
+            listPreferences = get(),
             clock = get(),
             midnightTicks = midnightDateFlow(get())
         )
     }
 
     single { DataStoreManager(androidContext().dataStore) }
+    single<EventListPreferences> { get<DataStoreManager>() }
 }

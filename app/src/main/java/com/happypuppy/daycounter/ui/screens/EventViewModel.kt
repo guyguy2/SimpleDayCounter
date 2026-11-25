@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
+import com.happypuppy.daycounter.data.preferences.EventListPreferences
+import com.happypuppy.daycounter.data.preferences.InMemoryEventListPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +40,7 @@ data class MainScreenUiState(
 
 class EventViewModel(
     private val repository: ItemRepository,
+    private val listPreferences: EventListPreferences = InMemoryEventListPreferences(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val midnightTicks: Flow<LocalDate> = emptyFlow()
 ) : ViewModel() {
@@ -46,8 +49,6 @@ class EventViewModel(
 
     private val _rawItems = MutableStateFlow<List<Item>?>(null)
     private val _today = MutableStateFlow(LocalDate.now(clock))
-    private val _sortOption = MutableStateFlow(SortOption.DATE_ADDED_DESC)
-    private val _filterState = MutableStateFlow(FilterState())
     private val _restoredItemKeys = MutableStateFlow<Map<Int, Long>>(emptyMap())
 
     private val tokenGenerator = AtomicLong(0L)
@@ -79,8 +80,8 @@ class EventViewModel(
             combine(
                 _rawItems,
                 _today,
-                _filterState,
-                _sortOption,
+                listPreferences.filterStateFlow,
+                listPreferences.sortOptionFlow,
                 _restoredItemKeys
             ) { rawItems, today, filterState, sortOption, restoredKeys ->
                 if (rawItems == null) {
@@ -133,15 +134,15 @@ class EventViewModel(
     fun itemById(id: Int): Item? = _rawItems.value?.find { it.id == id }
 
     fun setSortOption(option: SortOption) {
-        _sortOption.value = option
+        viewModelScope.launch { listPreferences.setSortOption(option) }
     }
 
     fun setFilterState(state: FilterState) {
-        _filterState.value = state
+        viewModelScope.launch { listPreferences.setFilterState(state) }
     }
 
     fun clearFilter() {
-        _filterState.value = FilterState()
+        setFilterState(FilterState())
     }
 
     fun saveItem(name: String, category: String, targetDate: Date, emoji: String = "") {

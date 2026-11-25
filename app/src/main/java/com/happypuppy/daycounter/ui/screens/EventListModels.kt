@@ -84,11 +84,14 @@ private const val FILTER_CATEGORY_KEY = "category"
 /** Lets [FilterState] live directly in `rememberSaveable` (enum stored by name). */
 val FilterStateSaver: Saver<FilterState, Any> = mapSaver(
     save = { mapOf(FILTER_OPTION_KEY to it.option.name, FILTER_CATEGORY_KEY to it.category) },
-    restore = {
-        FilterState(
-            option = FilterOption.valueOf(it[FILTER_OPTION_KEY] as String),
-            category = it[FILTER_CATEGORY_KEY] as String?
-        )
+    restore = { saved ->
+        val option = FilterOption.fromName(saved[FILTER_OPTION_KEY] as? String)
+        val category = if (option == FilterOption.CATEGORY) {
+            saved[FILTER_CATEGORY_KEY] as? String
+        } else {
+            null
+        }
+        FilterState(option = option, category = category)
     }
 )
 
