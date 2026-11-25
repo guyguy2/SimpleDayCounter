@@ -2,7 +2,6 @@ package com.happypuppy.daycounter
 
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -35,7 +34,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         splashScreen.setKeepOnScreenCondition { !startup.isResolved }
         enableEdgeToEdge()
-        if (BuildConfig.DEBUG) Log.d("MainActivity", "onCreate: savedInstanceState = $savedInstanceState")
 
         lifecycleScope.launch { startup.collectFrom(dataStoreManager.settingsFlow) }
 
@@ -72,11 +70,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        if (BuildConfig.DEBUG) Log.d("MainActivity", "onConfigurationChanged: orientation = ${newConfig.orientation}")
     }
 
     companion object {

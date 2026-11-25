@@ -22,17 +22,16 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.screens.MainTopBarTitle
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
+import com.happypuppy.daycounter.util.dayLabelFor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
-import java.time.ZoneId
-import java.util.Date
 import kotlin.math.ceil
 
 /**
@@ -47,8 +46,16 @@ class LargeFontInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun noonIn(days: Long): Date =
-        Date.from(LocalDate.now().plusDays(days).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+    private fun eventUi(name: String, daysFromToday: Int): EventUi = EventUi(
+        id = 1,
+        name = name,
+        category = "Personal",
+        targetDate = LocalDate.of(2026, 6, 15).plusDays(daysFromToday.toLong()),
+        daysLeft = daysFromToday,
+        dayLabel = dayLabelFor(daysFromToday),
+        emoji = "",
+        createdAtMillis = 0L
+    )
 
     private fun layoutOf(text: String): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
@@ -70,8 +77,8 @@ class LargeFontInstrumentedTest {
 
     @Test
     fun fourDigitDayCountStaysOnOneLineAtMaxFontScale() {
-        val item = Item(name = "Far away", itemCategory = "Personal", targetDate = noonIn(1135))
-        setLargeFontContent { EventCard(item = item, onClick = {}) }
+        val event = eventUi(name = "Far away", daysFromToday = 1135)
+        setLargeFontContent { EventCard(event = event, onClick = {}) }
 
         val layout = layoutOf("1135")
 

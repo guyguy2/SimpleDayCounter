@@ -42,6 +42,7 @@
     <string name="main_undo">Undo</string>
     <string name="main_empty_title">No Events Yet</string>
     <string name="main_empty_hint">Tap the + button to add your first event</string>
+    <string name="main_empty_add_cta">Add Your First Event</string>
     <string name="main_empty_filtered_title">No Events Match Filter</string>
     <string name="main_empty_filtered_hint">Try changing your filter settings</string>
     <string name="common_cancel">Cancel</string>

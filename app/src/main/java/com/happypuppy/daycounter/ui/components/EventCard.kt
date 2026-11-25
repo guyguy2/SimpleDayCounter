@@ -42,24 +42,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happypuppy.daycounter.R
-import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.formatDate
+import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
 import com.happypuppy.daycounter.ui.theme.LocalEventCardColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.DayLabel
-import com.happypuppy.daycounter.util.calculateDaysLeft
-import com.happypuppy.daycounter.util.dayLabelFor
 import com.happypuppy.daycounter.util.isColorBright
 
 @Composable
 fun EventCard(
-    item: Item,
+    event: EventUi,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
-    val daysLeft = calculateDaysLeft(item.targetDate)
+    val daysLeft = event.daysLeft
 
     // Theme + date format are resolved once at SimpleDayCounterTheme; consume them here instead
     // of re-collecting the DataStore flows per card (IMPROVEMENTS.md P1-5 / P1-1).
@@ -74,10 +72,10 @@ fun EventCard(
     val secondaryTextColor = stateColors.contentVariant
 
     // Get category color
-    val categoryColor = CategoryColors.getCategoryColor(item.itemCategory, isDarkTheme)
+    val categoryColor = CategoryColors.getCategoryColor(event.category, isDarkTheme)
 
     // Determine icon based on category
-    val categoryIcon = when (item.itemCategory) {
+    val categoryIcon = when (event.category) {
         "Personal" -> Icons.Default.Person
         "Work" -> Icons.Default.Work
         "Health" -> Icons.Default.HealthAndSafety
@@ -116,10 +114,10 @@ fun EventCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Left icon without circle - just show the emoji or icon
-            if (item.emoji.isNotBlank()) {
+            if (event.emoji.isNotBlank()) {
                 // Show custom emoji if set by user
                 Text(
-                    text = item.emoji,
+                    text = event.emoji,
                     fontSize = 40.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(end = 4.dp)
@@ -141,7 +139,7 @@ fun EventCard(
             ) {
                 // Event name at the top with larger spacing
                 Text(
-                    text = item.name,
+                    text = event.name,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = primaryTextColor
@@ -150,7 +148,7 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(8.dp)) // Additional spacing
 
                 // Date with the selected format
-                val formattedDate = formatDate(item.targetDate, dateFormat)
+                val formattedDate = formatDate(event.targetDate, dateFormat)
 
                 Text(
                     text = formattedDate,
@@ -159,9 +157,9 @@ fun EventCard(
                 )
 
                 // Category
-                if (item.itemCategory.isNotBlank()) {
+                if (event.category.isNotBlank()) {
                     Text(
-                        text = categoryDisplayName(item.itemCategory),
+                        text = categoryDisplayName(event.category),
                         style = MaterialTheme.typography.bodySmall,
                         color = secondaryTextColor
                     )
@@ -196,7 +194,7 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = when (val label = dayLabelFor(daysLeft)) {
+                    text = when (val label = event.dayLabel) {
                         DayLabel.Today -> stringResource(R.string.event_card_today)
                         is DayLabel.Left -> pluralStringResource(R.plurals.event_card_days_left, label.days)
                         is DayLabel.Past -> pluralStringResource(R.plurals.event_card_days_past, label.days)

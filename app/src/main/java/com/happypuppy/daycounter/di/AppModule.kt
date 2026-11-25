@@ -4,11 +4,14 @@ import androidx.room.Room
 import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.data.preferences.EventListPreferences
 import com.happypuppy.daycounter.data.preferences.dataStore
 import com.happypuppy.daycounter.ui.screens.EventViewModel
+import com.happypuppy.daycounter.util.midnightDateFlow
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModelOf
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import java.time.Clock
 
 // Create a Koin module
 val appModule = module {
@@ -31,8 +34,19 @@ val appModule = module {
     // Repository
     single { ItemRepository(get()) }
 
+    // Clock
+    single<Clock> { Clock.systemDefaultZone() }
+
     // ViewModel
-    viewModelOf(::EventViewModel)
+    viewModel {
+        EventViewModel(
+            repository = get(),
+            listPreferences = get(),
+            clock = get(),
+            midnightTicks = midnightDateFlow(get())
+        )
+    }
 
     single { DataStoreManager(androidContext().dataStore) }
+    single<EventListPreferences> { get<DataStoreManager>() }
 }

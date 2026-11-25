@@ -4,14 +4,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
+import com.happypuppy.daycounter.util.dayLabelFor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
-import java.time.ZoneId
-import java.util.Date
 
 /**
  * Characterization of the day count badge and the label under it (PLAN.md CQ-2, UX-7).
@@ -24,17 +23,28 @@ class EventCardDayLabelInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun noonIn(days: Long): Date =
-        Date.from(LocalDate.now().plusDays(days).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+    private fun eventUi(daysFromToday: Int): EventUi {
+        val today = LocalDate.of(2026, 6, 15)
+        return EventUi(
+            id = 1,
+            name = "Sample event",
+            category = "Personal",
+            targetDate = today.plusDays(daysFromToday.toLong()),
+            daysLeft = daysFromToday,
+            dayLabel = dayLabelFor(daysFromToday),
+            emoji = "",
+            createdAtMillis = 0L
+        )
+    }
 
-    private fun renderCard(daysFromToday: Long) {
-        val item = Item(name = "Sample event", itemCategory = "Personal", targetDate = noonIn(daysFromToday))
+    private fun renderCard(daysFromToday: Int) {
+        val event = eventUi(daysFromToday)
         rule.setContent {
-            SimpleDayCounterTheme(darkTheme = false) { EventCard(item = item, onClick = {}) }
+            SimpleDayCounterTheme(darkTheme = false) { EventCard(event = event, onClick = {}) }
         }
     }
 
-    private fun assertBadgeAndLabel(daysFromToday: Long, badge: String, label: String) {
+    private fun assertBadgeAndLabel(daysFromToday: Int, badge: String, label: String) {
         renderCard(daysFromToday)
         rule.onNodeWithText(badge, useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithText(label, useUnmergedTree = true).assertIsDisplayed()

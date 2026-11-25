@@ -1,6 +1,6 @@
 package com.happypuppy.daycounter.ui.screens
 
-import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +17,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,7 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
@@ -71,10 +72,6 @@ fun EditEventScreen(
     var targetDate by rememberSaveable(item.id) { mutableStateOf(item.targetDate) }
     var selectedCategory by rememberSaveable(item.id) { mutableStateOf(item.itemCategory) }
     var showDatePicker by rememberSaveable(item.id) { mutableStateOf(false) }
-
-    LaunchedEffect(showDatePicker) {
-        if (BuildConfig.DEBUG) Log.d("EditEventScreen", "Date picker visibility for item ${item.id}: $showDatePicker")
-    }
 
     // Opens the picker on a touch tap of the read-only date field.
     val dateInteractionSource = remember { MutableInteractionSource() }
@@ -175,8 +172,12 @@ fun EditEventScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Button(
+            OutlinedButton(
                 onClick = { onDelete(item) },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
                 modifier = Modifier.weight(1f)
             ) {
                 Text(stringResource(R.string.common_delete))
@@ -215,7 +216,6 @@ fun EditEventScreen(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
                         targetDate = utcPickerMillisToLocalDate(selectedMillis)
-                        if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen: New date set: $targetDate")
                     }
                     showDatePicker = false
                 }) {

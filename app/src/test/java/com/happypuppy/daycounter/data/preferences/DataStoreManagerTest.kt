@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.happypuppy.daycounter.ui.screens.FilterOption
+import com.happypuppy.daycounter.ui.screens.FilterState
+import com.happypuppy.daycounter.ui.screens.SortOption
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
@@ -302,5 +305,56 @@ class DataStoreManagerTest {
         }
 
         assertEquals(AppSettings(AppTheme.DARK, DateFormat.ISO, dynamicColor = false), DataStoreManager(store).settingsFlow.first())
+    }
+
+    // Sort and filter persistence (UX-11)
+
+    @Test
+    fun `sort option and filter state resolve to defaults on empty store`() = runBlocking {
+        val manager = newManager()
+
+        assertEquals(SortOption.DATE_ADDED_DESC, manager.sortOptionFlow.first())
+        assertEquals(FilterState(FilterOption.ALL, null), manager.filterStateFlow.first())
+    }
+
+    @Test
+    fun `sort option and category filter round trip across manager instances`() = runBlocking {
+        val (store, job) = openStore()
+        DataStoreManager(store).apply {
+            setSortOption(SortOption.NAME_ASC)
+            setFilterState(FilterState(FilterOption.CATEGORY, "Work"))
+        }
+        job.cancelAndJoin()
+
+        val reopened = DataStoreManager(openStore().first)
+        assertEquals(SortOption.NAME_ASC, reopened.sortOptionFlow.first())
+        assertEquals(FilterState(FilterOption.CATEGORY, "Work"), reopened.filterStateFlow.first())
+    }
+
+    @Test
+    fun `switching to a non-category filter clears stored filter category key`() = runBlocking {
+        val (store, _) = openStore()
+        val manager = DataStoreManager(store)
+
+        manager.setFilterState(FilterState(FilterOption.CATEGORY, "Health"))
+        assertEquals("Health", store.data.first()[FILTER_CATEGORY_KEY])
+
+        manager.setFilterState(FilterState(FilterOption.FUTURE))
+        assertEquals(FilterState(FilterOption.FUTURE, null), manager.filterStateFlow.first())
+        assertNull(store.data.first()[FILTER_CATEGORY_KEY])
+    }
+
+    @Test
+    fun `unknown stored sort and filter values fall back safely to defaults`() = runBlocking {
+        val (store, _) = openStore()
+        store.edit {
+            it[SORT_OPTION_KEY] = "REMOVED_SORT"
+            it[FILTER_OPTION_KEY] = "REMOVED_FILTER"
+            it[FILTER_CATEGORY_KEY] = "Work"
+        }
+
+        val manager = DataStoreManager(store)
+        assertEquals(SortOption.DATE_ADDED_DESC, manager.sortOptionFlow.first())
+        assertEquals(FilterState(FilterOption.ALL, null), manager.filterStateFlow.first())
     }
 }

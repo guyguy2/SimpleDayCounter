@@ -11,17 +11,22 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.ui.screens.FilterOption
+import com.happypuppy.daycounter.ui.screens.FilterState
+import com.happypuppy.daycounter.ui.screens.SortOption
+import java.io.IOException
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.io.IOException
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // DataStore for preferences
 const val SETTINGS_DATASTORE_NAME = "settings"
@@ -35,6 +40,9 @@ val VIBRATE_KEY = booleanPreferencesKey("vibrate_enabled")
 val DATE_FORMAT_KEY = stringPreferencesKey("date_format")
 val CUSTOM_CATEGORIES_KEY = stringSetPreferencesKey("custom_categories")
 val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
+val SORT_OPTION_KEY = stringPreferencesKey("sort_option")
+val FILTER_OPTION_KEY = stringPreferencesKey("filter_option")
+val FILTER_CATEGORY_KEY = stringPreferencesKey("filter_category")
 
 // Theme options
 enum class AppTheme(val value: String) {
@@ -84,7 +92,37 @@ data class AppSettings(
     }
 }
 
-class DataStoreManager(private val dataStore: DataStore<Preferences>) {
+interface EventListPreferences {
+    val sortOptionFlow: Flow<SortOption>
+    val filterStateFlow: Flow<FilterState>
+    suspend fun setSortOption(option: SortOption)
+    suspend fun setFilterState(state: FilterState)
+}
+
+class InMemoryEventListPreferences(
+    initialSort: SortOption = SortOption.DATE_ADDED_DESC,
+    initialFilter: FilterState = FilterState()
+) : EventListPreferences {
+    private val _sortOption = MutableStateFlow(initialSort)
+    private val _filterState = MutableStateFlow(initialFilter)
+
+    override val sortOptionFlow: Flow<SortOption> = _sortOption.asStateFlow()
+    override val filterStateFlow: Flow<FilterState> = _filterState.asStateFlow()
+
+    override suspend fun setSortOption(option: SortOption) {
+        _sortOption.value = option
+    }
+
+    override suspend fun setFilterState(state: FilterState) {
+        _filterState.value = if (state.option == FilterOption.CATEGORY) {
+            state
+        } else {
+            FilterState(option = state.option, category = null)
+        }
+    }
+}
+
+class DataStoreManager(private val dataStore: DataStore<Preferences>) : EventListPreferences {
     private fun themeOf(preferences: Preferences): AppTheme =
         AppTheme.fromString(preferences[THEME_KEY] ?: AppTheme.SYSTEM_DEFAULT.value)
 
@@ -170,16 +208,54 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    override val sortOptionFlow: Flow<SortOption> = data
+        .map { preferences -> SortOption.fromName(preferences[SORT_OPTION_KEY]) }
+        .distinctUntilChanged()
+
+    override suspend fun setSortOption(option: SortOption) {
+        dataStore.edit { settings ->
+            settings[SORT_OPTION_KEY] = option.name
+        }
+    }
+
+    override val filterStateFlow: Flow<FilterState> = data
+        .map { preferences ->
+            val option = FilterOption.fromName(preferences[FILTER_OPTION_KEY])
+            val category = if (option == FilterOption.CATEGORY) {
+                preferences[FILTER_CATEGORY_KEY]
+            } else {
+                null
+            }
+            FilterState(option = option, category = category)
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setFilterState(state: FilterState) {
+        dataStore.edit { settings ->
+            settings[FILTER_OPTION_KEY] = state.option.name
+            if (state.option == FilterOption.CATEGORY && state.category != null) {
+                settings[FILTER_CATEGORY_KEY] = state.category
+            } else {
+                settings.remove(FILTER_CATEGORY_KEY)
+            }
+        }
+    }
+
 }
 
 /**
  * Pure date formatter - no DataStore dependency (IMPROVEMENTS.md P1-1). [DateFormat.SYSTEM] uses
  * the locale's own medium date style; every other option is a fixed pattern with locale month names.
  */
+fun formatDate(date: LocalDate, format: DateFormat, locale: Locale = Locale.getDefault()): String {
+    val formatter = when (val pattern = format.formatPattern) {
+        null -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+        else -> DateTimeFormatter.ofPattern(pattern, locale)
+    }
+    return formatter.format(date)
+}
+
 fun formatDate(date: Date, format: DateFormat, locale: Locale = Locale.getDefault()): String {
-    val pattern = format.formatPattern
-        ?: return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-            .withLocale(locale)
-            .format(date.toInstant().atZone(ZoneId.systemDefault()))
-    return SimpleDateFormat(pattern, locale).format(date)
+    val localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    return formatDate(localDate, format, locale)
 }
