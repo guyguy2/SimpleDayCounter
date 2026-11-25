@@ -496,4 +496,66 @@ class MainFlowInstrumentedTest {
             }
         }
     }
+
+    @Test
+    fun addSheetInlineCustomCategoryPreservesFormAndAutoSelects() {
+        openAddSheet()
+        rule.onNodeWithText("Event Name").performTextInput("Marathon")
+
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom\u2026").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
+        rule.onNodeWithText("New Category").performTextInput("fitness goals")
+        rule.onNodeWithText("Add").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Fitness Goals"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Marathon").assertExists()
+
+        rule.onNodeWithText("Save Event").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Marathon"), timeoutMillis = 5_000)
+
+        val store = koin.get<DataStoreManager>()
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) {
+                "Fitness Goals" in store.customCategoriesFlow.first()
+            }
+        }
+    }
+
+    @Test
+    fun editSheetInlineCustomCategoryPreservesEditsAndAutoSelects() {
+        openEditSheet("Checkup")
+
+        rule.onNodeWithText("Event Name").performTextClearance()
+        rule.onNodeWithText("Event Name").performTextInput("Annual checkup")
+
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom\u2026").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
+        rule.onNodeWithText("New Category").performTextInput("medical")
+        rule.onNodeWithText("Add").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Medical"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Annual checkup").assertExists()
+
+        rule.onNodeWithText("Save").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Annual checkup"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Checkup").assertDoesNotExist()
+    }
+
+    @Test
+    fun addSheetEmojiSuggestionPopulatesFieldAndSaves() {
+        openAddSheet()
+        rule.onNodeWithText("Event Name").performTextInput("Birthday")
+
+        rule.onNodeWithContentDescription("Birthday emoji").performClick()
+        rule.onNodeWithText("Save Event").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Birthday"), timeoutMillis = 5_000)
+        rule.onNodeWithText("\uD83C\uDF82").assertExists()
+    }
 }

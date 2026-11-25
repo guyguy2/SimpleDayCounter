@@ -49,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +71,8 @@ import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EmptyEventsState
+import com.happypuppy.daycounter.ui.components.EventFormState
+import com.happypuppy.daycounter.ui.components.EventFormStateSaver
 import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.FilterMenu
 import com.happypuppy.daycounter.ui.components.SortMenu
@@ -77,7 +80,9 @@ import com.happypuppy.daycounter.ui.components.SwipeToDeleteItem
 import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.DayLabel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import java.time.LocalDate
@@ -86,7 +91,6 @@ import java.time.LocalDate
 @Composable
 fun MainScreen(
     onOpenSettings: () -> Unit,
-    onOpenCategories: () -> Unit,
     viewModel: EventViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -102,6 +106,12 @@ fun MainScreen(
 
     var showAddEventSheet by rememberSaveable { mutableStateOf(false) }
     var showEditEventSheet by rememberSaveable { mutableStateOf(false) }
+    var addFormState by rememberSaveable(stateSaver = EventFormStateSaver) {
+        mutableStateOf(EventFormState.defaultNew())
+    }
+    var editFormState by rememberSaveable(stateSaver = EventFormStateSaver) {
+        mutableStateOf(EventFormState.defaultNew())
+    }
 
     // Save only the selected item's id; resolve the Item against the current list so the
     // edit sheet survives configuration changes and process death (IMPROVEMENTS.md F-1).
@@ -149,6 +159,17 @@ fun MainScreen(
     val allCategories = remember(customCategories) {
         defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER)
     }
+    val scope = rememberCoroutineScope()
+    val handleAddCustomCategory: (String) -> Unit = { normalized ->
+        scope.launch {
+            try {
+                dataStoreManager.addCustomCategory(normalized)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     // Show undo snackbar for one-shot delete/undo Channel events. collectLatest cancels any
     // superseded snackbar with CancellationException so SnackbarResult.Dismissed only runs
@@ -179,10 +200,16 @@ fun MainScreen(
         isVibrationEnabled = isVibrationEnabled,
         snackbarHostState = snackbarHostState,
         onOpenSettings = onOpenSettings,
-        onAddEvent = { showAddEventSheet = true },
+        onAddEvent = {
+            addFormState = EventFormState.defaultNew()
+            showAddEventSheet = true
+        },
         onEditEvent = { id ->
-            selectedItemId = id
-            showEditEventSheet = true
+            viewModel.itemById(id)?.let { item ->
+                editFormState = EventFormState.fromItem(item)
+                selectedItemId = id
+                showEditEventSheet = true
+            }
         },
         onDeleteEvent = viewModel::deleteEvent,
         onSelectSortOption = viewModel::setSortOption,
@@ -194,22 +221,33 @@ fun MainScreen(
     // Add event sheet
     if (showAddEventSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showAddEventSheet = false },
+            onDismissRequest = {
+                showAddEventSheet = false
+                addFormState = EventFormState.defaultNew()
+            },
             sheetState = addSheetState
         ) {
             AddEventBottomSheet(
-                dataStoreManager = dataStoreManager,
-                onDismiss = { showAddEventSheet = false },
-                onSave = { name, date, category, emoji ->
-                    viewModel.saveItem(
-                        name = name,
-                        category = category,
-                        targetDate = date,
-                        emoji = emoji
-                    )
+                state = addFormState,
+                customCategories = customCategories,
+                onStateChange = { addFormState = it },
+                onAddCustomCategory = handleAddCustomCategory,
+                onDismiss = {
                     showAddEventSheet = false
+                    addFormState = EventFormState.defaultNew()
                 },
-                onOpenCategories = onOpenCategories
+                onSave = {
+                    if (addFormState.canSave) {
+                        viewModel.saveItem(
+                            name = addFormState.trimmedName,
+                            category = addFormState.selectedCategory,
+                            targetDate = addFormState.targetDate,
+                            emoji = addFormState.emoji
+                        )
+                        showAddEventSheet = false
+                        addFormState = EventFormState.defaultNew()
+                    }
+                }
             )
         }
     }
@@ -217,21 +255,28 @@ fun MainScreen(
     // Edit event sheet
     if (showEditEventSheet && selectedItem != null) {
         ModalBottomSheet(
-            onDismissRequest = { showEditEventSheet = false },
+            onDismissRequest = {
+                showEditEventSheet = false
+                selectedItemId = null
+            },
             sheetState = editSheetState
         ) {
             EditEventScreen(
                 item = selectedItem,
-                dataStoreManager = dataStoreManager,
+                state = editFormState,
+                customCategories = customCategories,
+                onStateChange = { editFormState = it },
+                onAddCustomCategory = handleAddCustomCategory,
                 onSave = { item ->
                     viewModel.updateItem(item)
                     showEditEventSheet = false
+                    selectedItemId = null
                 },
                 onDelete = { item ->
                     viewModel.deleteItem(item)
                     showEditEventSheet = false
-                },
-                onOpenCategories = onOpenCategories
+                    selectedItemId = null
+                }
             )
         }
     }

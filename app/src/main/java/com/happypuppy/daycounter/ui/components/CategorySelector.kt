@@ -13,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.happypuppy.daycounter.R
-import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.theme.CategoryColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 
@@ -31,19 +29,20 @@ val defaultCategories = listOf("Personal", "Work", "Health", "Finance")
 /** Menu sentinel for the "Add Custom..." entry; shown through a string resource, never stored. */
 private const val ADD_CUSTOM_CATEGORY_KEY = "Add Custom..."
 
+/**
+ * Stateless category selector dropdown listing default categories, sorted custom categories,
+ * and an entry to trigger inline custom-category creation.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategorySelector(
     selectedCategory: String,
+    customCategories: Set<String>,
     onCategorySelected: (String) -> Unit,
-    dataStoreManager: DataStoreManager,
-    modifier: Modifier = Modifier,
-    onOpenCategories: () -> Unit = {},
+    onAddCustomClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var showCategoryDropdown by remember { mutableStateOf(false) }
-
-    // Get custom categories from DataStore (injected at screen root - P1-1)
-    val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
 
     // Theme is resolved once at SimpleDayCounterTheme (IMPROVEMENTS.md P1-5).
     val isDarkTheme = LocalIsDarkTheme.current
@@ -102,8 +101,7 @@ fun CategorySelector(
                         },
                         onClick = {
                             if (category == ADD_CUSTOM_CATEGORY_KEY) {
-                                // Navigate to the Category Management screen instead of showing input
-                                onOpenCategories()
+                                onAddCustomClick()
                             } else {
                                 onCategorySelected(category)
                             }

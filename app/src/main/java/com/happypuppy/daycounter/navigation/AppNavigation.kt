@@ -50,8 +50,7 @@ fun AppNavigation() {
             }
         ) {
             MainScreen(
-                onOpenSettings = { navController.navigate(Screen.Settings) },
-                onOpenCategories = { navController.navigate(Screen.CategoryManagement) }
+                onOpenSettings = { navController.navigate(Screen.Settings) }
             )
         }
 
