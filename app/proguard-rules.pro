@@ -56,6 +56,7 @@
 # ---------------------------------------------------------------------------
 -keep class com.happypuppy.daycounter.di.** { *; }
 -keep class com.happypuppy.daycounter.ui.screens.EventViewModel { *; }
+-keep class com.happypuppy.daycounter.ui.screens.CategoryManagementViewModel { *; }
 -keepclassmembers class * extends androidx.lifecycle.ViewModel {
     <init>(...);
 }

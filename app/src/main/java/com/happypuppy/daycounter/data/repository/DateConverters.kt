@@ -1,6 +1,7 @@
 package com.happypuppy.daycounter.data.repository
 
 import androidx.room.TypeConverter
+import java.time.LocalDate
 import java.util.Date
 
 /**
@@ -15,5 +16,15 @@ class DateConverters {
     @TypeConverter
     fun dateToTimestamp(date: Date?): Long? {
         return date?.time
+    }
+
+    @TypeConverter
+    fun fromLocalDateString(value: String?): LocalDate? {
+        return value?.let(LocalDate::parse)
+    }
+
+    @TypeConverter
+    fun localDateToString(date: LocalDate?): String? {
+        return date?.toString()
     }
 }
