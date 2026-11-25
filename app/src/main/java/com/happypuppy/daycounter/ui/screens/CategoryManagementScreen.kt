@@ -1,7 +1,6 @@
 package com.happypuppy.daycounter.ui.screens
 
 import android.content.res.Configuration
-import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,7 +47,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddCategoryInput
@@ -83,8 +81,6 @@ fun CategoryManagementScreen(onBack: () -> Unit) {
     val isDarkTheme = LocalIsDarkTheme.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    if (BuildConfig.DEBUG) Log.d("CategoryManagementScreen", "Orientation: ${if (isLandscape) "Landscape" else "Portrait"}")
 
     Scaffold(
         topBar = {

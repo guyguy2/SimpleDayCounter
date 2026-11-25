@@ -36,6 +36,7 @@ import com.happypuppy.daycounter.MainActivity
 import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.ui.screens.FilterOption
 import com.happypuppy.daycounter.ui.screens.FilterState
 import com.happypuppy.daycounter.ui.screens.SortOption
 import kotlinx.coroutines.Dispatchers
@@ -437,5 +438,62 @@ class MainFlowInstrumentedTest {
 
         // Normalized to Title Case by normalizeCategoryName.
         rule.waitUntilExactlyOneExists(hasText("Travel Plans"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun emptyStateCtaOpensAddEventSheet() {
+        rule.onNodeWithText("Add Your First Event").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add New Event"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun filteredEmptyStateClearFilterButtonRestoresEvents() {
+        addEvent("Today only")
+
+        rule.onNodeWithContentDescription("Filter").performClick()
+        rule.onNodeWithText("Past Events").performClick()
+        rule.waitUntilExactlyOneExists(hasText("No Events Match Filter"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Today only").assertDoesNotExist()
+
+        rule.onNodeWithText("Clear Filter").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Today only"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun multiUndoRestoresTwoConsecutivelyDeletedEvents() {
+        addEvent("First event")
+        addEvent("Second event")
+
+        rule.onNodeWithText("First event").performCustomAccessibilityActionWithLabel("Delete")
+        rule.waitUntilExactlyOneExists(hasText("\"First event\" deleted"), timeoutMillis = 5_000)
+
+        rule.onNodeWithText("Second event").performCustomAccessibilityActionWithLabel("Delete")
+        rule.waitUntilExactlyOneExists(hasText("\"Second event\" deleted"), timeoutMillis = 5_000)
+
+        rule.onNodeWithText("Undo").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Second event"), timeoutMillis = 5_000)
+        rule.waitUntilExactlyOneExists(hasText("\"First event\" deleted"), timeoutMillis = 5_000)
+
+        rule.onNodeWithText("Undo").performClick()
+        rule.waitUntilExactlyOneExists(hasText("First event"), timeoutMillis = 5_000)
+    }
+
+    @Test
+    fun sortAndFilterPreferencesPersistInDataStore() {
+        rule.onNodeWithContentDescription("Sort").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Name (A-Z)"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Name (A-Z)").performClick()
+
+        rule.onNodeWithContentDescription("Filter").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Future Events"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Future Events").performClick()
+
+        val store = koin.get<DataStoreManager>()
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) {
+                store.sortOptionFlow.first() == SortOption.NAME_ASC &&
+                    store.filterStateFlow.first() == FilterState(FilterOption.FUTURE)
+            }
+        }
     }
 }

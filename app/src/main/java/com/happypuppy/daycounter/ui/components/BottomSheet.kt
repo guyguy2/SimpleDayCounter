@@ -1,6 +1,5 @@
 package com.happypuppy.daycounter.ui.components
 
-import android.util.Log
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.formatDate
@@ -70,10 +68,6 @@ fun AddEventBottomSheet(
     var targetDate by rememberSaveable { mutableStateOf(Date()) }
     var selectedCategory by rememberSaveable { mutableStateOf("Personal") }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(showDatePicker) {
-        if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker visibility changed to: $showDatePicker")
-    }
 
     // Opens the picker on a touch tap of the read-only date field.
     val dateInteractionSource = remember { MutableInteractionSource() }
@@ -183,7 +177,6 @@ fun AddEventBottomSheet(
             Button(
                 onClick = {
                     if (eventName.isNotBlank()) {
-                        if (BuildConfig.DEBUG) Log.d("AddEvent", "Saving event: $eventName, date: $targetDate, category: $selectedCategory, emoji: $eventEmoji")
                         onSave(eventName.trim(), targetDate, selectedCategory, eventEmoji)
                     }
                 },
@@ -199,18 +192,12 @@ fun AddEventBottomSheet(
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = localDateToUtcPickerMillis(targetDate)
         )
-        if (BuildConfig.DEBUG) Log.d("DatePicker", "Showing date picker dialog")
         DatePickerDialog(
-            onDismissRequest = {
-                if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker dismissed")
-                showDatePicker = false
-            },
+            onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    if (BuildConfig.DEBUG) Log.d("DatePicker", "Date selection confirmed")
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
                         targetDate = utcPickerMillisToLocalDate(selectedMillis)
-                        if (BuildConfig.DEBUG) Log.d("DatePicker", "New date set: $targetDate")
                     }
                     showDatePicker = false
                 }) {
@@ -218,10 +205,7 @@ fun AddEventBottomSheet(
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    if (BuildConfig.DEBUG) Log.d("DatePicker", "Date picker cancelled")
-                    showDatePicker = false
-                }) {
+                TextButton(onClick = { showDatePicker = false }) {
                     Text(stringResource(R.string.common_cancel))
                 }
             }

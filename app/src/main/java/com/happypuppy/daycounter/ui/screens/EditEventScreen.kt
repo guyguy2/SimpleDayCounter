@@ -1,6 +1,5 @@
 package com.happypuppy.daycounter.ui.screens
 
-import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -46,7 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
@@ -74,10 +72,6 @@ fun EditEventScreen(
     var targetDate by rememberSaveable(item.id) { mutableStateOf(item.targetDate) }
     var selectedCategory by rememberSaveable(item.id) { mutableStateOf(item.itemCategory) }
     var showDatePicker by rememberSaveable(item.id) { mutableStateOf(false) }
-
-    LaunchedEffect(showDatePicker) {
-        if (BuildConfig.DEBUG) Log.d("EditEventScreen", "Date picker visibility for item ${item.id}: $showDatePicker")
-    }
 
     // Opens the picker on a touch tap of the read-only date field.
     val dateInteractionSource = remember { MutableInteractionSource() }
@@ -222,7 +216,6 @@ fun EditEventScreen(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
                         targetDate = utcPickerMillisToLocalDate(selectedMillis)
-                        if (BuildConfig.DEBUG) Log.d("DatePicker", "Edit screen: New date set: $targetDate")
                     }
                     showDatePicker = false
                 }) {

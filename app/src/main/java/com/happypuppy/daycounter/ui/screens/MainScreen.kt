@@ -4,18 +4,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,32 +53,34 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.happypuppy.daycounter.BuildConfig
 import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
+import com.happypuppy.daycounter.ui.components.EmptyEventsState
 import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.FilterMenu
 import com.happypuppy.daycounter.ui.components.SortMenu
 import com.happypuppy.daycounter.ui.components.SwipeToDeleteItem
 import com.happypuppy.daycounter.ui.components.defaultCategories
+import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
+import com.happypuppy.daycounter.util.DayLabel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +99,6 @@ fun MainScreen(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
     )
-    var showSortMenu by rememberSaveable { mutableStateOf(false) }
 
     var showAddEventSheet by rememberSaveable { mutableStateOf(false) }
     var showEditEventSheet by rememberSaveable { mutableStateOf(false) }
@@ -111,8 +109,6 @@ fun MainScreen(
     val selectedItem = remember(uiState.events, selectedItemId) {
         selectedItemId?.let(viewModel::itemById)
     }
-    var showFilterMenu by rememberSaveable { mutableStateOf(false) }
-    var showCategoryFilterOptions by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -144,15 +140,6 @@ fun MainScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
-    // Log orientation changes
-    val configuration = LocalConfiguration.current
-    LaunchedEffect(configuration) {
-        if (BuildConfig.DEBUG) Log.d("MainScreen", "Configuration changed: orientation=${configuration.orientation}")
-    }
-
-    val filterState = uiState.filterState
-    val selectedSortOption = uiState.sortOption
 
     // Get all category names (both default and custom); inject at screen root (P1-1)
     val dataStoreManager = koinInject<DataStoreManager>()
@@ -186,6 +173,93 @@ fun MainScreen(
         }
     }
 
+    MainScreenContent(
+        uiState = uiState,
+        categories = allCategories,
+        isVibrationEnabled = isVibrationEnabled,
+        snackbarHostState = snackbarHostState,
+        onOpenSettings = onOpenSettings,
+        onAddEvent = { showAddEventSheet = true },
+        onEditEvent = { id ->
+            selectedItemId = id
+            showEditEventSheet = true
+        },
+        onDeleteEvent = viewModel::deleteEvent,
+        onSelectSortOption = viewModel::setSortOption,
+        onSelectFilterState = viewModel::setFilterState,
+        onClearFilter = viewModel::clearFilter,
+        onDismissError = viewModel::clearError
+    )
+
+    // Add event sheet
+    if (showAddEventSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAddEventSheet = false },
+            sheetState = addSheetState
+        ) {
+            AddEventBottomSheet(
+                dataStoreManager = dataStoreManager,
+                onDismiss = { showAddEventSheet = false },
+                onSave = { name, date, category, emoji ->
+                    viewModel.saveItem(
+                        name = name,
+                        category = category,
+                        targetDate = date,
+                        emoji = emoji
+                    )
+                    showAddEventSheet = false
+                },
+                onOpenCategories = onOpenCategories
+            )
+        }
+    }
+
+    // Edit event sheet
+    if (showEditEventSheet && selectedItem != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showEditEventSheet = false },
+            sheetState = editSheetState
+        ) {
+            EditEventScreen(
+                item = selectedItem,
+                dataStoreManager = dataStoreManager,
+                onSave = { item ->
+                    viewModel.updateItem(item)
+                    showEditEventSheet = false
+                },
+                onDelete = { item ->
+                    viewModel.deleteItem(item)
+                    showEditEventSheet = false
+                },
+                onOpenCategories = onOpenCategories
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreenContent(
+    uiState: MainScreenUiState,
+    categories: List<String>,
+    isVibrationEnabled: Boolean,
+    snackbarHostState: SnackbarHostState,
+    onOpenSettings: () -> Unit,
+    onAddEvent: () -> Unit,
+    onEditEvent: (Int) -> Unit,
+    onDeleteEvent: (Int) -> Unit,
+    onSelectSortOption: (SortOption) -> Unit,
+    onSelectFilterState: (FilterState) -> Unit,
+    onClearFilter: () -> Unit,
+    onDismissError: () -> Unit
+) {
+    var showSortMenu by rememberSaveable { mutableStateOf(false) }
+    var showFilterMenu by rememberSaveable { mutableStateOf(false) }
+    var showCategoryFilterOptions by rememberSaveable { mutableStateOf(false) }
+
+    val filterState = uiState.filterState
+    val selectedSortOption = uiState.sortOption
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
@@ -201,8 +275,11 @@ fun MainScreen(
                 actions = {
                     IconButton(onClick = { showFilterMenu = true }) {
                         Icon(
-                            imageVector = if (filterState.option != FilterOption.ALL)
-                                Icons.Default.FilterAlt else Icons.Default.FilterList,
+                            imageVector = if (filterState.option != FilterOption.ALL) {
+                                Icons.Default.FilterAlt
+                            } else {
+                                Icons.Default.FilterList
+                            },
                             contentDescription = stringResource(R.string.main_filter)
                         )
 
@@ -210,8 +287,8 @@ fun MainScreen(
                             expanded = showFilterMenu,
                             showCategoryOptions = showCategoryFilterOptions,
                             filterState = filterState,
-                            categories = allCategories,
-                            onSelectFilter = viewModel::setFilterState,
+                            categories = categories,
+                            onSelectFilter = onSelectFilterState,
                             onDismiss = { showFilterMenu = false },
                             onOpenCategories = { showCategoryFilterOptions = true },
                             onDismissCategories = { showCategoryFilterOptions = false }
@@ -226,7 +303,7 @@ fun MainScreen(
                         SortMenu(
                             expanded = showSortMenu,
                             selectedSortOption = selectedSortOption,
-                            onSelectOption = viewModel::setSortOption,
+                            onSelectOption = onSelectSortOption,
                             onDismiss = { showSortMenu = false }
                         )
                     }
@@ -243,7 +320,7 @@ fun MainScreen(
         floatingActionButton = {
             val addEventLabel = stringResource(R.string.add_event)
             ExtendedFloatingActionButton(
-                onClick = { showAddEventSheet = true },
+                onClick = onAddEvent,
                 modifier = Modifier.semantics { contentDescription = addEventLabel },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -291,7 +368,7 @@ fun MainScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f)
                             )
-                            TextButton(onClick = { viewModel.clearError() }) {
+                            TextButton(onClick = onDismissError) {
                                 Text(
                                     text = stringResource(R.string.main_dismiss),
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -305,7 +382,7 @@ fun MainScreen(
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
                         filterState = filterState,
-                        onClear = viewModel::clearFilter
+                        onClear = onClearFilter
                     )
                 }
 
@@ -323,34 +400,17 @@ fun MainScreen(
                     }
 
                     uiState.events.isEmpty() -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = 16.dp,
-                                    bottom = innerPadding.calculateBottomPadding() + 16.dp
-                                ),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = if (filterState.option != FilterOption.ALL)
-                                    stringResource(R.string.main_empty_filtered_title) else stringResource(R.string.main_empty_title),
-                                style = MaterialTheme.typography.headlineMedium,
-                                textAlign = TextAlign.Center
+                        EmptyEventsState(
+                            isFiltered = filterState.option != FilterOption.ALL,
+                            onAddEvent = onAddEvent,
+                            onClearFilter = onClearFilter,
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 16.dp,
+                                bottom = innerPadding.calculateBottomPadding() + 16.dp
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = if (filterState.option != FilterOption.ALL)
-                                    stringResource(R.string.main_empty_filtered_hint)
-                                else stringResource(R.string.main_empty_hint),
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        )
                     }
 
                     else -> {
@@ -366,67 +426,18 @@ fun MainScreen(
                         ) {
                             items(
                                 items = uiState.events,
-                                // Include restoration token so undo remounts the row
-                                // (resets swipe state).
+                                // Include restoreVersion so undo remounts the row (resets swipe state).
                                 key = { event -> "${event.id}_${event.restoreVersion}" }
                             ) { event ->
                                 SwipeToDeleteItem(
                                     event = event,
                                     isVibrationEnabled = isVibrationEnabled,
-                                    onDelete = { viewModel.deleteEvent(event.id) },
-                                    onClick = {
-                                        selectedItemId = event.id
-                                        showEditEventSheet = true
-                                    }
+                                    onDelete = { onDeleteEvent(event.id) },
+                                    onClick = { onEditEvent(event.id) }
                                 )
                             }
                         }
                     }
-                }
-            }
-
-            // Add event sheet
-            if (showAddEventSheet) {
-                ModalBottomSheet(
-                    onDismissRequest = { showAddEventSheet = false },
-                    sheetState = addSheetState
-                ) {
-                    AddEventBottomSheet(
-                        dataStoreManager = dataStoreManager,
-                        onDismiss = { showAddEventSheet = false },
-                        onSave = { name, date, category, emoji ->
-                            viewModel.saveItem(
-                                name = name,
-                                category = category,
-                                targetDate = date,
-                                emoji = emoji
-                            )
-                            showAddEventSheet = false
-                        },
-                        onOpenCategories = onOpenCategories
-                    )
-                }
-            }
-
-            // Edit event sheet
-            if (showEditEventSheet && selectedItem != null) {
-                ModalBottomSheet(
-                    onDismissRequest = { showEditEventSheet = false },
-                    sheetState = editSheetState
-                ) {
-                    EditEventScreen(
-                        item = selectedItem,
-                        dataStoreManager = dataStoreManager,
-                        onSave = { item ->
-                            viewModel.updateItem(item)
-                            showEditEventSheet = false
-                        },
-                        onDelete = { item ->
-                            viewModel.deleteItem(item)
-                            showEditEventSheet = false
-                        },
-                        onOpenCategories = onOpenCategories
-                    )
                 }
             }
         }
@@ -440,4 +451,130 @@ internal fun MainTopBarTitle() {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
+}
+
+private fun previewEvents(): List<EventUi> {
+    val today = LocalDate.of(2026, 6, 15)
+    return listOf(
+        EventUi(
+            id = 1,
+            name = "Vacation",
+            category = "Personal",
+            targetDate = today.plusDays(14),
+            daysLeft = 14,
+            dayLabel = DayLabel.Left(14),
+            emoji = "\u2708\uFE0F",
+            createdAtMillis = 3_000L
+        ),
+        EventUi(
+            id = 2,
+            name = "Dentist",
+            category = "Health",
+            targetDate = today,
+            daysLeft = 0,
+            dayLabel = DayLabel.Today,
+            emoji = "",
+            createdAtMillis = 2_000L
+        ),
+        EventUi(
+            id = 3,
+            name = "Tax Filing",
+            category = "Finance",
+            targetDate = today.minusDays(3),
+            daysLeft = -3,
+            dayLabel = DayLabel.Past(3),
+            emoji = "",
+            createdAtMillis = 1_000L
+        )
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MainScreenEmptyLightPreview() {
+    SimpleDayCounterTheme(darkTheme = false) {
+        MainScreenContent(
+            uiState = MainScreenUiState(),
+            categories = defaultCategories,
+            isVibrationEnabled = true,
+            snackbarHostState = remember { SnackbarHostState() },
+            onOpenSettings = {},
+            onAddEvent = {},
+            onEditEvent = {},
+            onDeleteEvent = {},
+            onSelectSortOption = {},
+            onSelectFilterState = {},
+            onClearFilter = {},
+            onDismissError = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MainScreenEmptyDarkPreview() {
+    SimpleDayCounterTheme(darkTheme = true) {
+        MainScreenContent(
+            uiState = MainScreenUiState(),
+            categories = defaultCategories,
+            isVibrationEnabled = true,
+            snackbarHostState = remember { SnackbarHostState() },
+            onOpenSettings = {},
+            onAddEvent = {},
+            onEditEvent = {},
+            onDeleteEvent = {},
+            onSelectSortOption = {},
+            onSelectFilterState = {},
+            onClearFilter = {},
+            onDismissError = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MainScreenPopulatedLightPreview() {
+    SimpleDayCounterTheme(darkTheme = false) {
+        MainScreenContent(
+            uiState = MainScreenUiState(
+                events = previewEvents(),
+                hasAnyEvents = true
+            ),
+            categories = defaultCategories,
+            isVibrationEnabled = true,
+            snackbarHostState = remember { SnackbarHostState() },
+            onOpenSettings = {},
+            onAddEvent = {},
+            onEditEvent = {},
+            onDeleteEvent = {},
+            onSelectSortOption = {},
+            onSelectFilterState = {},
+            onClearFilter = {},
+            onDismissError = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MainScreenPopulatedDarkPreview() {
+    SimpleDayCounterTheme(darkTheme = true) {
+        MainScreenContent(
+            uiState = MainScreenUiState(
+                events = previewEvents(),
+                hasAnyEvents = true
+            ),
+            categories = defaultCategories,
+            isVibrationEnabled = true,
+            snackbarHostState = remember { SnackbarHostState() },
+            onOpenSettings = {},
+            onAddEvent = {},
+            onEditEvent = {},
+            onDeleteEvent = {},
+            onSelectSortOption = {},
+            onSelectFilterState = {},
+            onClearFilter = {},
+            onDismissError = {}
+        )
+    }
 }
