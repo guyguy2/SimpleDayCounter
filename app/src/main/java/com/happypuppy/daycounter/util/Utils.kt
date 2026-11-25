@@ -7,6 +7,7 @@ import android.os.VibrationEffect
 import android.os.VibratorManager
 import androidx.compose.ui.graphics.Color
 import java.text.BreakIterator
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -106,6 +107,21 @@ fun localDateToUtcPickerMillis(
 }
 
 /**
+ * Anchors [localDate] at 12:00 local time in [zoneId] so calendar-day conversions stay resilient
+ * across DST transitions and timezone offset boundaries.
+ */
+fun localDateToNoonDate(
+    localDate: LocalDate,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Date = Date.from(localDate.atTime(12, 0).atZone(zoneId).toInstant())
+
+/**
+ * Returns today's calendar date from [clock] anchored at 12:00 local time in `clock.zone`.
+ */
+fun todayAtNoon(clock: Clock = Clock.systemDefaultZone()): Date =
+    localDateToNoonDate(LocalDate.now(clock), clock.zone)
+
+/**
  * Converts a UTC midnight millisecond timestamp from Material3's `DatePicker` into a [Date]
  * anchored at 12:00 local time in [zoneId] on that calendar date.
  */
@@ -114,7 +130,7 @@ fun utcPickerMillisToLocalDate(
     zoneId: ZoneId = ZoneId.systemDefault()
 ): Date {
     val localDate = Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()
-    return Date.from(localDate.atTime(12, 0).atZone(zoneId).toInstant())
+    return localDateToNoonDate(localDate, zoneId)
 }
 
 /**
