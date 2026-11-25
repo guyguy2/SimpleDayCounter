@@ -96,7 +96,11 @@ class StringLiteralGuardTest {
 
     private companion object {
         /** Compose animation labels (debug tooling names, never displayed). */
-        val ALLOWED_LITERALS = setOf("Alpha Animation", "SwipeDeleteBackground")
+        val ALLOWED_LITERALS = setOf(
+            "Alpha Animation",
+            "SwipeDeleteBackground",
+            "SwipeDeleteIconScale"
+        )
 
         // A literal counts only if it contains a letter: "+" or "" are symbols, not copy.
         const val LITERAL = "\"([^\"\\n]*[A-Za-z][^\"\\n]*)\""
