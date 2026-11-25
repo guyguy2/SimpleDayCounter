@@ -11,7 +11,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,24 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.happypuppy.daycounter.R
-import com.happypuppy.daycounter.data.preferences.DataStoreManager
+import com.happypuppy.daycounter.data.database.normalizeCategoryNameValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /**
  * Trims leading/trailing whitespace, collapses internal whitespace runs to a single space,
  * and title-cases each word.
  */
-fun normalizeCategoryName(raw: String): String =
-    raw.trim()
-        .split(Regex("\\s+"))
-        .filter { it.isNotEmpty() }
-        .joinToString(" ") { word ->
-            word.replaceFirstChar { ch ->
-                if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
-            }
-        }
+fun normalizeCategoryName(raw: String): String = normalizeCategoryNameValue(raw)
 
 /**
  * Returns true if [candidate] (after normalization) matches any default category or
@@ -57,18 +47,18 @@ fun isDuplicateCategory(
 }
 
 /**
- * A reusable component for adding new custom categories.
+ * A reusable stateless component for adding new custom categories.
  */
 @Composable
 fun AddCategoryInput(
-    dataStoreManager: DataStoreManager,
+    existingCustomCategories: Set<String>,
+    onAddCategory: suspend (String) -> Unit,
     onCategoryAdded: (String) -> Unit = {},
     onCancel: () -> Unit = {},
     placeholder: String = stringResource(R.string.category_name_placeholder),
 ) {
     var categoryText by rememberSaveable { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }
-    val existingCustomCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
     val scope = rememberCoroutineScope()
 
     val isDuplicate = remember(categoryText, existingCustomCategories) {
@@ -109,7 +99,7 @@ fun AddCategoryInput(
                             isAdding = true
                             scope.launch {
                                 try {
-                                    dataStoreManager.addCustomCategory(formattedCategory)
+                                    onAddCategory(formattedCategory)
                                     onCategoryAdded(formattedCategory)
                                 } catch (e: CancellationException) {
                                     throw e

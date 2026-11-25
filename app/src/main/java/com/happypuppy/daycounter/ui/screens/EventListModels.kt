@@ -4,18 +4,20 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.dayLabelFor
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 data class EventUi(
     val id: Int,
     val name: String,
-    val category: String,
+    val categoryId: String,
+    val categoryName: String,
     val targetDate: LocalDate,
     val daysLeft: Int,
     val dayLabel: DayLabel,
@@ -26,16 +28,17 @@ data class EventUi(
 
 fun Item.toEventUi(
     today: LocalDate,
-    zoneId: ZoneId = ZoneId.systemDefault(),
+    categoriesById: Map<String, Category> = DEFAULT_CATEGORIES.associateBy { it.id },
     restoreVersion: Int = 0
 ): EventUi {
-    val targetLocalDate = targetDate.toInstant().atZone(zoneId).toLocalDate()
-    val daysLeft = ChronoUnit.DAYS.between(today, targetLocalDate).toInt()
+    val resolvedCategory = categoriesById[categoryId] ?: DEFAULT_CATEGORIES.first()
+    val daysLeft = ChronoUnit.DAYS.between(today, targetDate).toInt()
     return EventUi(
         id = id,
         name = name,
-        category = itemCategory,
-        targetDate = targetLocalDate,
+        categoryId = resolvedCategory.id,
+        categoryName = resolvedCategory.name,
+        targetDate = targetDate,
         daysLeft = daysLeft,
         dayLabel = dayLabelFor(daysLeft),
         emoji = emoji,
@@ -95,14 +98,18 @@ val FilterStateSaver: Saver<FilterState, Any> = mapSaver(
     }
 )
 
-fun filterItems(items: List<Item>, filterState: FilterState): List<Item> {
+fun filterItems(
+    items: List<Item>,
+    filterState: FilterState,
+    today: LocalDate = LocalDate.now()
+): List<Item> {
     return when (filterState.option) {
         FilterOption.ALL -> items
-        FilterOption.FUTURE -> items.filter { calculateDaysLeft(it.targetDate) > 0 }
-        FilterOption.TODAY -> items.filter { calculateDaysLeft(it.targetDate) == 0 }
-        FilterOption.PAST -> items.filter { calculateDaysLeft(it.targetDate) < 0 }
-        FilterOption.CATEGORY -> filterState.category?.let { category ->
-            items.filter { it.itemCategory == category }
+        FilterOption.FUTURE -> items.filter { calculateDaysLeft(it.targetDate, today) > 0 }
+        FilterOption.TODAY -> items.filter { calculateDaysLeft(it.targetDate, today) == 0 }
+        FilterOption.PAST -> items.filter { calculateDaysLeft(it.targetDate, today) < 0 }
+        FilterOption.CATEGORY -> filterState.category?.let { categoryId ->
+            items.filter { it.categoryId == categoryId }
         } ?: items // If category is null, show all items
     }
 }
@@ -115,8 +122,8 @@ fun sortItems(items: List<Item>, option: SortOption): List<Item> {
         SortOption.TARGET_DATE_DESC -> items.sortedByDescending { it.targetDate }
         SortOption.DATE_ADDED_ASC -> items.sortedBy { it.createdAt }
         SortOption.DATE_ADDED_DESC -> items.sortedByDescending { it.createdAt }
-        SortOption.CATEGORY_ASC -> items.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
-        SortOption.CATEGORY_DESC -> items.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
+        SortOption.CATEGORY_ASC -> items.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.categoryId })
+        SortOption.CATEGORY_DESC -> items.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.categoryId })
     }
 }
 
@@ -126,8 +133,8 @@ fun filterEvents(events: List<EventUi>, filterState: FilterState): List<EventUi>
         FilterOption.FUTURE -> events.filter { it.daysLeft > 0 }
         FilterOption.TODAY -> events.filter { it.daysLeft == 0 }
         FilterOption.PAST -> events.filter { it.daysLeft < 0 }
-        FilterOption.CATEGORY -> filterState.category?.let { category ->
-            events.filter { it.category == category }
+        FilterOption.CATEGORY -> filterState.category?.let { categoryId ->
+            events.filter { it.categoryId == categoryId }
         } ?: events
     }
 }
@@ -140,7 +147,7 @@ fun sortEvents(events: List<EventUi>, option: SortOption): List<EventUi> {
         SortOption.TARGET_DATE_DESC -> events.sortedByDescending { it.targetDate }
         SortOption.DATE_ADDED_ASC -> events.sortedBy { it.createdAtMillis }
         SortOption.DATE_ADDED_DESC -> events.sortedByDescending { it.createdAtMillis }
-        SortOption.CATEGORY_ASC -> events.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.category })
-        SortOption.CATEGORY_DESC -> events.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.category })
+        SortOption.CATEGORY_ASC -> events.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.categoryName })
+        SortOption.CATEGORY_DESC -> events.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.categoryName })
     }
 }

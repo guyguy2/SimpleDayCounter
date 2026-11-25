@@ -80,7 +80,7 @@ import com.happypuppy.daycounter.util.AppVersionInfo
 import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import java.util.Date
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -486,7 +486,7 @@ fun DateFormatSetting(dataStoreManager: DataStoreManager) {
     val scope = rememberCoroutineScope()
     val currentFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
     var showFormatOptions by remember { mutableStateOf(false) }
-    val sampleDate = remember { Date() }
+    val sampleDate = remember { LocalDate.now() }
 
     Row(
         modifier = Modifier

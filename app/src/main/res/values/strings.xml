@@ -119,10 +119,30 @@
     <string name="category_mgmt_empty_portrait">No custom categories yet. Add one using the + button.</string>
     <string name="category_mgmt_delete_title">Delete Category</string>
     <string name="category_mgmt_delete_message">Are you sure you want to delete \"%1$s\"?</string>
+    <plurals name="category_mgmt_delete_in_use_message">
+        <item quantity="one">\"%1$s\" is used by %2$d event. Deleting it will move that event to Personal.</item>
+        <item quantity="other">\"%1$s\" is used by %2$d events. Deleting it will move those events to Personal.</item>
+    </plurals>
     <string name="category_mgmt_delete_all_title">Delete All Custom Categories</string>
-    <string name="category_mgmt_delete_all_message">Are you sure you want to delete all custom categories? This action cannot be undone.</string>
+    <string name="category_mgmt_delete_all_message">Are you sure you want to delete all custom categories?</string>
+    <plurals name="category_mgmt_delete_all_in_use_message">
+        <item quantity="one">Delete all custom categories? %1$d event will be moved to Personal.</item>
+        <item quantity="other">Delete all custom categories? %1$d events will be moved to Personal.</item>
+    </plurals>
     <string name="category_mgmt_delete_all_confirm">Delete All</string>
     <string name="category_mgmt_delete_cd">Delete Category</string>
+    <plurals name="category_mgmt_event_count">
+        <item quantity="one">%1$d event</item>
+        <item quantity="other">%1$d events</item>
+    </plurals>
+    <string name="category_mgmt_event_count_zero">No events</string>
+    <string name="category_mgmt_deleted">\"%1$s\" deleted</string>
+    <string name="category_mgmt_all_deleted">All custom categories deleted</string>
+    <string name="category_mgmt_error_load_failed">Failed to load categories</string>
+    <string name="category_mgmt_error_add_failed">Failed to add category</string>
+    <string name="category_mgmt_error_duplicate">Category already exists</string>
+    <string name="category_mgmt_error_delete_failed">Failed to delete category</string>
+    <string name="category_mgmt_error_restore_failed">Failed to restore category</string>
     <string name="filter_chip_category">Category: %1$s</string>
     <string name="filter_clear">Clear Filter</string>
     <string name="category_personal">Personal</string>

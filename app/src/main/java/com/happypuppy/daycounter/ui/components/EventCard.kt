@@ -52,6 +52,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.CategoryColors
@@ -83,14 +87,18 @@ fun EventCard(
     val secondaryTextColor = stateColors.contentVariant
 
     // Get category color
-    val categoryColor = CategoryColors.getCategoryColor(event.category, isDarkTheme)
+    val categoryColor = CategoryColors.getCategoryColor(
+        categoryId = event.categoryId,
+        categoryName = event.categoryName,
+        isDarkTheme = isDarkTheme
+    )
 
-    // Determine icon based on category
-    val categoryIcon = when (event.category) {
-        "Personal" -> Icons.Default.Person
-        "Work" -> Icons.Default.Work
-        "Health" -> Icons.Default.HealthAndSafety
-        "Finance" -> Icons.Default.Payments
+    // Determine icon based on stable category ID
+    val categoryIcon = when (event.categoryId) {
+        DEFAULT_CATEGORY_ID -> Icons.Default.Person
+        WORK_CATEGORY_ID -> Icons.Default.Work
+        HEALTH_CATEGORY_ID -> Icons.Default.HealthAndSafety
+        FINANCE_CATEGORY_ID -> Icons.Default.Payments
         else -> Icons.Default.Event // Default icon for custom categories
     }
 
@@ -195,9 +203,9 @@ fun EventCard(
                 )
 
                 // Category
-                if (event.category.isNotBlank()) {
+                if (event.categoryName.isNotBlank()) {
                     Text(
-                        text = categoryDisplayName(event.category),
+                        text = categoryDisplayName(event.categoryId, event.categoryName),
                         style = MaterialTheme.typography.bodySmall,
                         color = secondaryTextColor
                     )

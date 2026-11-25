@@ -1,44 +1,71 @@
 package com.happypuppy.daycounter.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 
 /**
- * Predefined colors for default categories
+ * Predefined colors for default categories and deterministic colors for custom categories.
  */
 object CategoryColors {
-    // Color map for default categories - Light Theme
-    val defaultCategoryColorsLight = mapOf(
-        "Personal" to Color(0xFFE57373), // Light Red
-        "Work" to Color(0xFF64B5F6),     // Light Blue
-        "Health" to Color(0xFF81C784),   // Light Green
-        "Finance" to Color(0xFFFFD54F)   // Light Amber
+    // Color map for default categories keyed by stable Category.id - Light Theme
+    val defaultCategoryColorsByIdLight = mapOf(
+        DEFAULT_CATEGORY_ID to Color(0xFFE57373), // Light Red
+        WORK_CATEGORY_ID to Color(0xFF64B5F6),     // Light Blue
+        HEALTH_CATEGORY_ID to Color(0xFF81C784),   // Light Green
+        FINANCE_CATEGORY_ID to Color(0xFFFFD54F)   // Light Amber
     )
 
-    // Color map for default categories - Dark Theme
+    // Color map for default categories keyed by stable Category.id - Dark Theme
+    val defaultCategoryColorsByIdDark = mapOf(
+        DEFAULT_CATEGORY_ID to Color(0xFFCF6679), // Dark Red
+        WORK_CATEGORY_ID to Color(0xFF90CAF9),     // Dark Blue
+        HEALTH_CATEGORY_ID to Color(0xFFA5D6A7),   // Dark Green
+        FINANCE_CATEGORY_ID to Color(0xFFFFE082)   // Dark Amber
+    )
+
+    // Legacy name-keyed maps retained for compatibility in tests/callers.
+    val defaultCategoryColorsLight = mapOf(
+        "Personal" to defaultCategoryColorsByIdLight.getValue(DEFAULT_CATEGORY_ID),
+        "Work" to defaultCategoryColorsByIdLight.getValue(WORK_CATEGORY_ID),
+        "Health" to defaultCategoryColorsByIdLight.getValue(HEALTH_CATEGORY_ID),
+        "Finance" to defaultCategoryColorsByIdLight.getValue(FINANCE_CATEGORY_ID)
+    )
+
     val defaultCategoryColorsDark = mapOf(
-        "Personal" to Color(0xFFCF6679), // Dark Red
-        "Work" to Color(0xFF90CAF9),     // Dark Blue
-        "Health" to Color(0xFFA5D6A7),   // Dark Green
-        "Finance" to Color(0xFFFFE082)   // Dark Amber
+        "Personal" to defaultCategoryColorsByIdDark.getValue(DEFAULT_CATEGORY_ID),
+        "Work" to defaultCategoryColorsByIdDark.getValue(WORK_CATEGORY_ID),
+        "Health" to defaultCategoryColorsByIdDark.getValue(HEALTH_CATEGORY_ID),
+        "Finance" to defaultCategoryColorsByIdDark.getValue(FINANCE_CATEGORY_ID)
     )
 
     // Cache for derived custom category colors (deterministic per name).
     private val customCategoryColors = mutableMapOf<String, Pair<Color, Color>>()
 
     /**
-     * Get color for a category based on theme
-     *
-     * @param category The category name
-     * @param isDarkTheme Whether dark theme is active
-     * @return The color for the category
+     * Get color for a category based on stable [categoryId], display [categoryName], and theme.
+     * Custom categories derive their color deterministically from [categoryName] so migrating to
+     * UUID IDs preserves existing user colors.
+     */
+    fun getCategoryColor(categoryId: String, categoryName: String, isDarkTheme: Boolean): Color {
+        return if (isDarkTheme) {
+            defaultCategoryColorsByIdDark[categoryId]
+                ?: defaultCategoryColorsDark[categoryName]
+                ?: getOrCreateCustomCategoryColor(categoryName).second
+        } else {
+            defaultCategoryColorsByIdLight[categoryId]
+                ?: defaultCategoryColorsLight[categoryName]
+                ?: getOrCreateCustomCategoryColor(categoryName).first
+        }
+    }
+
+    /**
+     * Convenience overload when only category name or ID is passed.
      */
     fun getCategoryColor(category: String, isDarkTheme: Boolean): Color {
-        // Check if category is a default category
-        return if (isDarkTheme) {
-            defaultCategoryColorsDark[category] ?: getOrCreateCustomCategoryColor(category).second
-        } else {
-            defaultCategoryColorsLight[category] ?: getOrCreateCustomCategoryColor(category).first
-        }
+        return getCategoryColor(categoryId = category, categoryName = category, isDarkTheme = isDarkTheme)
     }
 
     /**

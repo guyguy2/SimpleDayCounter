@@ -52,7 +52,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,6 +71,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EmptyEventsState
@@ -82,7 +86,6 @@ import com.happypuppy.daycounter.ui.components.FilterChip
 import com.happypuppy.daycounter.ui.components.FilterMenu
 import com.happypuppy.daycounter.ui.components.SortMenu
 import com.happypuppy.daycounter.ui.components.SwipeToDeleteItem
-import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.ui.layout.ADAPTIVE_CONTENT_MAX_WIDTH
 import com.happypuppy.daycounter.ui.layout.ADAPTIVE_GRID_MIN_CELL_WIDTH
 import com.happypuppy.daycounter.ui.layout.AdaptiveEventFormContainer
@@ -91,9 +94,7 @@ import com.happypuppy.daycounter.ui.layout.rememberAdaptiveLayoutSpec
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.vibrate
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import java.time.LocalDate
@@ -166,25 +167,9 @@ fun MainScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Get all category names (both default and custom); inject at screen root (P1-1)
     val dataStoreManager = koinInject<DataStoreManager>()
-    val customCategories by dataStoreManager.customCategoriesFlow.collectAsState(initial = emptySet())
     val isVibrationEnabled by dataStoreManager.vibrateEnabledFlow.collectAsState(initial = true)
-    // Filter menu lists real categories only; the "Add Custom..." entry belongs to CategorySelector.
-    val allCategories = remember(customCategories) {
-        defaultCategories + customCategories.sortedWith(String.CASE_INSENSITIVE_ORDER)
-    }
-    val scope = rememberCoroutineScope()
-    val handleAddCustomCategory: (String) -> Unit = { normalized ->
-        scope.launch {
-            try {
-                dataStoreManager.addCustomCategory(normalized)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-            }
-        }
-    }
+    val categories = uiState.categories
 
     // Show undo snackbar for one-shot delete/undo Channel events. collectLatest cancels any
     // superseded snackbar with CancellationException so SnackbarResult.Dismissed only runs
@@ -211,7 +196,7 @@ fun MainScreen(
 
     MainScreenContent(
         uiState = uiState,
-        categories = allCategories,
+        categories = categories,
         isVibrationEnabled = isVibrationEnabled,
         snackbarHostState = snackbarHostState,
         onOpenSettings = onOpenSettings,
@@ -246,9 +231,9 @@ fun MainScreen(
         ) {
             AddEventBottomSheet(
                 state = addFormState,
-                customCategories = customCategories,
+                categories = categories,
                 onStateChange = { addFormState = it },
-                onAddCustomCategory = handleAddCustomCategory,
+                onAddCustomCategory = viewModel::addCustomCategory,
                 onDismiss = {
                     showAddEventSheet = false
                     addFormState = EventFormState.defaultNew()
@@ -257,7 +242,7 @@ fun MainScreen(
                     if (addFormState.canSave) {
                         viewModel.saveItem(
                             name = addFormState.trimmedName,
-                            category = addFormState.selectedCategory,
+                            categoryId = addFormState.selectedCategoryId,
                             targetDate = addFormState.targetDate,
                             emoji = addFormState.emoji
                         )
@@ -282,9 +267,9 @@ fun MainScreen(
             EditEventScreen(
                 item = selectedItem,
                 state = editFormState,
-                customCategories = customCategories,
+                categories = categories,
                 onStateChange = { editFormState = it },
-                onAddCustomCategory = handleAddCustomCategory,
+                onAddCustomCategory = viewModel::addCustomCategory,
                 onSave = { item ->
                     viewModel.updateItem(item)
                     showEditEventSheet = false
@@ -304,7 +289,7 @@ fun MainScreen(
 @Composable
 fun MainScreenContent(
     uiState: MainScreenUiState,
-    categories: List<String>,
+    categories: List<Category>,
     isVibrationEnabled: Boolean,
     snackbarHostState: SnackbarHostState,
     onOpenSettings: () -> Unit,
@@ -449,6 +434,7 @@ fun MainScreenContent(
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
                         filterState = filterState,
+                        categories = categories,
                         onClear = onClearFilter,
                         modifier = Modifier.widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
                     )
@@ -574,7 +560,8 @@ private fun previewEvents(): List<EventUi> {
         EventUi(
             id = 1,
             name = "Vacation",
-            category = "Personal",
+            categoryId = DEFAULT_CATEGORY_ID,
+            categoryName = "Personal",
             targetDate = today.plusDays(14),
             daysLeft = 14,
             dayLabel = DayLabel.Left(14),
@@ -584,7 +571,8 @@ private fun previewEvents(): List<EventUi> {
         EventUi(
             id = 2,
             name = "Dentist",
-            category = "Health",
+            categoryId = HEALTH_CATEGORY_ID,
+            categoryName = "Health",
             targetDate = today,
             daysLeft = 0,
             dayLabel = DayLabel.Today,
@@ -594,7 +582,8 @@ private fun previewEvents(): List<EventUi> {
         EventUi(
             id = 3,
             name = "Tax Filing",
-            category = "Finance",
+            categoryId = FINANCE_CATEGORY_ID,
+            categoryName = "Finance",
             targetDate = today.minusDays(3),
             daysLeft = -3,
             dayLabel = DayLabel.Past(3),
@@ -610,7 +599,7 @@ private fun MainScreenEmptyLightPreview() {
     SimpleDayCounterTheme(darkTheme = false) {
         MainScreenContent(
             uiState = MainScreenUiState(),
-            categories = defaultCategories,
+            categories = DEFAULT_CATEGORIES,
             isVibrationEnabled = true,
             snackbarHostState = remember { SnackbarHostState() },
             onOpenSettings = {},
@@ -631,7 +620,7 @@ private fun MainScreenEmptyDarkPreview() {
     SimpleDayCounterTheme(darkTheme = true) {
         MainScreenContent(
             uiState = MainScreenUiState(),
-            categories = defaultCategories,
+            categories = DEFAULT_CATEGORIES,
             isVibrationEnabled = true,
             snackbarHostState = remember { SnackbarHostState() },
             onOpenSettings = {},
@@ -655,7 +644,7 @@ private fun MainScreenPopulatedLightPreview() {
                 events = previewEvents(),
                 hasAnyEvents = true
             ),
-            categories = defaultCategories,
+            categories = DEFAULT_CATEGORIES,
             isVibrationEnabled = true,
             snackbarHostState = remember { SnackbarHostState() },
             onOpenSettings = {},
@@ -679,7 +668,7 @@ private fun MainScreenPopulatedDarkPreview() {
                 events = previewEvents(),
                 hasAnyEvents = true
             ),
-            categories = defaultCategories,
+            categories = DEFAULT_CATEGORIES,
             isVibrationEnabled = true,
             snackbarHostState = remember { SnackbarHostState() },
             onOpenSettings = {},
@@ -703,7 +692,7 @@ private fun MainScreenTabletLightPreview() {
                 events = previewEvents(),
                 hasAnyEvents = true
             ),
-            categories = defaultCategories,
+            categories = DEFAULT_CATEGORIES,
             isVibrationEnabled = true,
             snackbarHostState = remember { SnackbarHostState() },
             onOpenSettings = {},

@@ -2,6 +2,11 @@ package com.happypuppy.daycounter.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.happypuppy.daycounter.data.database.AddCategoryResult
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.CategoryRepository
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.preferences.EventListPreferences
@@ -30,6 +35,7 @@ sealed interface MainUiEvent {
 
 data class MainScreenUiState(
     val events: List<EventUi> = emptyList(),
+    val categories: List<Category> = DEFAULT_CATEGORIES,
     val hasAnyEvents: Boolean = false,
     val sortOption: SortOption = SortOption.DATE_ADDED_DESC,
     val filterState: FilterState = FilterState(),
@@ -40,6 +46,7 @@ data class MainScreenUiState(
 
 class EventViewModel(
     private val repository: ItemRepository,
+    private val categoryRepository: CategoryRepository,
     private val listPreferences: EventListPreferences = InMemoryEventListPreferences(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val midnightTicks: Flow<LocalDate> = emptyFlow()
@@ -51,6 +58,7 @@ class EventViewModel(
     val events: Flow<MainUiEvent> = _events.receiveAsFlow()
 
     private val _rawItems = MutableStateFlow<List<Item>?>(null)
+    private val _categories = MutableStateFlow(DEFAULT_CATEGORIES)
     private val _today = MutableStateFlow(LocalDate.now(clock))
     private val _undoOverlay = MutableStateFlow(UndoUiOverlay())
 
@@ -58,7 +66,17 @@ class EventViewModel(
     private val dbMutex = Mutex()
 
     init {
+        viewModelScope.launch {
+            try {
+                categoryRepository.ensureInitialized()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Underlying Room flows report LoadFailed if database reads fail.
+            }
+        }
         observeItems()
+        observeCategories()
         observeCombinedState()
         observeMidnightTicks()
     }
@@ -87,31 +105,50 @@ class EventViewModel(
         }
     }
 
+    private fun observeCategories() {
+        viewModelScope.launch {
+            categoryRepository.observeCategories()
+                .catch {
+                    _uiState.update { state -> state.copy(error = EventError.LoadFailed, isLoading = false) }
+                }
+                .collect { categories ->
+                    _categories.value = categories.ifEmpty { DEFAULT_CATEGORIES }
+                }
+        }
+    }
+
     private fun observeCombinedState() {
         viewModelScope.launch {
-            combine(
-                _rawItems,
-                _today,
+            val dataSnapshot = combine(_rawItems, _categories, _today) { rawItems, categories, today ->
+                Triple(rawItems, categories, today)
+            }
+            val uiPrefsSnapshot = combine(
                 listPreferences.filterStateFlow,
                 listPreferences.sortOptionFlow,
                 _undoOverlay
-            ) { rawItems, today, filterState, sortOption, overlay ->
+            ) { filterState, sortOption, overlay ->
+                Triple(filterState, sortOption, overlay)
+            }
+            combine(dataSnapshot, uiPrefsSnapshot) { (rawItems, categories, today), (filterState, sortOption, overlay) ->
                 if (rawItems == null) {
                     null
                 } else {
+                    val categoriesById = categories.associateBy { it.id }
+                    val effectiveFilter = resolveFilterState(filterState, categories, categoriesById)
                     val visibleItems = rawItems.filterNot { it.id in overlay.pendingDeletedIds }
                     val mapped = visibleItems.map { item ->
                         item.toEventUi(
                             today = today,
-                            zoneId = clock.zone,
+                            categoriesById = categoriesById,
                             restoreVersion = overlay.restoreVersions[item.id] ?: 0
                         )
                     }
                     CombinedEvents(
-                        events = sortEvents(filterEvents(mapped, filterState), sortOption),
+                        events = sortEvents(filterEvents(mapped, effectiveFilter), sortOption),
+                        categories = categories,
                         hasAnyEvents = visibleItems.isNotEmpty(),
                         sortOption = sortOption,
-                        filterState = filterState,
+                        filterState = effectiveFilter,
                         canUndo = overlay.canUndo
                     )
                 }
@@ -120,6 +157,7 @@ class EventViewModel(
                     _uiState.update { current ->
                         current.copy(
                             events = combined.events,
+                            categories = combined.categories,
                             hasAnyEvents = combined.hasAnyEvents,
                             sortOption = combined.sortOption,
                             filterState = combined.filterState,
@@ -129,6 +167,25 @@ class EventViewModel(
                     }
                 }
             }
+        }
+    }
+
+    private fun resolveFilterState(
+        filterState: FilterState,
+        categories: List<Category>,
+        categoriesById: Map<String, Category>
+    ): FilterState {
+        if (filterState.option != FilterOption.CATEGORY || filterState.category == null) {
+            return filterState
+        }
+        if (filterState.category in categoriesById) {
+            return filterState
+        }
+        val matchedByName = categories.find { it.name.equals(filterState.category, ignoreCase = true) }
+        return if (matchedByName != null) {
+            filterState.copy(category = matchedByName.id)
+        } else {
+            filterState
         }
     }
 
@@ -159,13 +216,32 @@ class EventViewModel(
         setFilterState(FilterState())
     }
 
-    fun saveItem(name: String, category: String, targetDate: Date, emoji: String = "") {
+    suspend fun addCustomCategory(rawName: String): Category? {
+        return try {
+            when (val result = categoryRepository.addCustomCategory(rawName)) {
+                is AddCategoryResult.Added -> result.category
+                is AddCategoryResult.Duplicate -> result.existing
+                AddCategoryResult.Invalid -> null
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            _uiState.update { it.copy(error = EventError.SaveFailed) }
+            null
+        }
+    }
+
+    fun saveItem(name: String, categoryId: String, targetDate: LocalDate, emoji: String = "") {
         viewModelScope.launch {
             try {
+                categoryRepository.ensureInitialized()
+                val validCategoryId = categoryId.takeIf { id ->
+                    id.isNotBlank() && _categories.value.any { it.id == id }
+                } ?: DEFAULT_CATEGORY_ID
                 repository.insertItem(
                     Item(
                         name = name,
-                        itemCategory = category,
+                        categoryId = validCategoryId,
                         targetDate = targetDate,
                         createdAt = Date.from(clock.instant()),
                         emoji = emoji
@@ -182,7 +258,11 @@ class EventViewModel(
     fun updateItem(item: Item) {
         viewModelScope.launch {
             try {
-                repository.insertItem(item)
+                categoryRepository.ensureInitialized()
+                val validCategoryId = item.categoryId.takeIf { id ->
+                    id.isNotBlank() && _categories.value.any { it.id == id }
+                } ?: DEFAULT_CATEGORY_ID
+                repository.insertItem(item.copy(categoryId = validCategoryId))
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -276,6 +356,7 @@ class EventViewModel(
 
     private data class CombinedEvents(
         val events: List<EventUi>,
+        val categories: List<Category>,
         val hasAnyEvents: Boolean,
         val sortOption: SortOption,
         val filterState: FilterState,

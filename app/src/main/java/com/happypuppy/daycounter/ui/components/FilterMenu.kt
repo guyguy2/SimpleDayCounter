@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.happypuppy.daycounter.R
+import com.happypuppy.daycounter.data.database.Category
 import com.happypuppy.daycounter.ui.screens.FilterOption
 import com.happypuppy.daycounter.ui.screens.FilterState
 
@@ -27,7 +28,7 @@ fun FilterMenu(
     expanded: Boolean,
     showCategoryOptions: Boolean,
     filterState: FilterState,
-    categories: List<String>,
+    categories: List<Category>,
     onSelectFilter: (FilterState) -> Unit,
     onDismiss: () -> Unit,
     onOpenCategories: () -> Unit,
@@ -96,14 +97,14 @@ fun FilterMenu(
                     onSelectFilter(
                         FilterState(
                             option = FilterOption.CATEGORY,
-                            category = category
+                            category = category.id
                         )
                     )
                     onDismissCategories()
                     onDismiss()
                 },
                 trailingIcon = if (filterState.option == FilterOption.CATEGORY &&
-                    filterState.category == category
+                    filterState.category == category.id
                 ) {
                     {
                         Icon(
