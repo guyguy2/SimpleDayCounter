@@ -1,8 +1,11 @@
 package com.happypuppy.daycounter.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,10 +30,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -55,6 +65,7 @@ import com.happypuppy.daycounter.util.isColorBright
 fun EventCard(
     event: EventUi,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     onDelete: (() -> Unit)? = null
 ) {
     val daysLeft = event.daysLeft
@@ -91,10 +102,33 @@ fun EventCard(
         if (onDelete != null) add(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClickLabel = editLabel) { onClick() }
+            .onKeyEvent { keyEvent ->
+                if (onDelete != null &&
+                    keyEvent.type == KeyEventType.KeyDown &&
+                    keyEvent.nativeKeyEvent.repeatCount == 0 &&
+                    (keyEvent.key == Key.Delete ||
+                        keyEvent.key == Key.Backspace ||
+                        keyEvent.key == Key.NumPadDelete)
+                ) {
+                    onDelete()
+                    true
+                } else {
+                    false
+                }
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClickLabel = editLabel,
+                onClick = onClick
+            )
             .semantics { customActions = accessibilityActions },
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor,
@@ -104,7 +138,11 @@ fun EventCard(
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = if (isFocused) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
     ) {
         Row(
             modifier = Modifier
