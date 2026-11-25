@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Date
@@ -38,6 +39,8 @@ class DateConvertersAndFormatTest {
     fun `DateConverters handles null values`() {
         assertNull(converters.fromTimestamp(null))
         assertNull(converters.dateToTimestamp(null))
+        assertNull(converters.fromLocalDateString(null))
+        assertNull(converters.localDateToString(null))
     }
 
     @Test
@@ -50,14 +53,29 @@ class DateConvertersAndFormatTest {
     }
 
     @Test
-    fun `formatDate formats date for every DateFormat option`() {
-        val sample = Date.from(LocalDateTime.of(2026, 12, 31, 12, 0).toInstant(ZoneOffset.UTC))
+    fun `DateConverters round-trips ISO-8601 LocalDate strings`() {
+        val samples = listOf(
+            LocalDate.of(1970, 1, 1) to "1970-01-01",
+            LocalDate.of(2024, 2, 29) to "2024-02-29",
+            LocalDate.of(2026, 12, 31) to "2026-12-31"
+        )
+        for ((date, iso) in samples) {
+            assertEquals(iso, converters.localDateToString(date))
+            assertEquals(date, converters.fromLocalDateString(iso))
+        }
+    }
 
+    @Test
+    fun `formatDate formats LocalDate and Date for every DateFormat option`() {
+        val localDate = LocalDate.of(2026, 12, 31)
+        assertEquals("Dec 31, 2026", formatDate(localDate, DateFormat.DEFAULT))
+        assertEquals("12/31/2026", formatDate(localDate, DateFormat.US))
+        assertEquals("31/12/2026", formatDate(localDate, DateFormat.EU))
+        assertEquals("2026-12-31", formatDate(localDate, DateFormat.ISO))
+        assertEquals("December 31, 2026", formatDate(localDate, DateFormat.FULL))
+
+        val sample = Date.from(LocalDateTime.of(2026, 12, 31, 12, 0).toInstant(ZoneOffset.UTC))
         assertEquals("Dec 31, 2026", formatDate(sample, DateFormat.DEFAULT))
-        assertEquals("12/31/2026", formatDate(sample, DateFormat.US))
-        assertEquals("31/12/2026", formatDate(sample, DateFormat.EU))
-        assertEquals("2026-12-31", formatDate(sample, DateFormat.ISO))
-        assertEquals("December 31, 2026", formatDate(sample, DateFormat.FULL))
     }
 
     @Test

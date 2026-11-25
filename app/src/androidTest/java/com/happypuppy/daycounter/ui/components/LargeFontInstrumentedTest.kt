@@ -22,6 +22,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.screens.MainTopBarTitle
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
@@ -49,7 +50,8 @@ class LargeFontInstrumentedTest {
     private fun eventUi(name: String, daysFromToday: Int): EventUi = EventUi(
         id = 1,
         name = name,
-        category = "Personal",
+        categoryId = DEFAULT_CATEGORY_ID,
+        categoryName = "Personal",
         targetDate = LocalDate.of(2026, 6, 15).plusDays(daysFromToday.toLong()),
         daysLeft = daysFromToday,
         dayLabel = dayLabelFor(daysFromToday),

@@ -18,10 +18,14 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventFormState
 import com.happypuppy.daycounter.ui.components.SWIPE_DELETE_BACKGROUND_TAG
-import com.happypuppy.daycounter.ui.components.defaultCategories
 import com.happypuppy.daycounter.ui.layout.ADAPTIVE_EVENT_FORM_DIALOG_TAG
 import com.happypuppy.daycounter.ui.layout.ADAPTIVE_EVENT_FORM_SHEET_TAG
 import com.happypuppy.daycounter.ui.layout.AdaptiveEventFormContainer
@@ -56,10 +60,10 @@ class AdaptiveLayoutInstrumentedTest {
     private fun sampleEvents(): List<EventUi> {
         val today = LocalDate.of(2026, 6, 15)
         return listOf(
-            EventUi(1, "Alpha", "Personal", today.plusDays(10), 10, dayLabelFor(10), "", 4_000L),
-            EventUi(2, "Bravo", "Work", today.plusDays(5), 5, dayLabelFor(5), "", 3_000L),
-            EventUi(3, "Charlie", "Health", today, 0, dayLabelFor(0), "", 2_000L),
-            EventUi(4, "Delta", "Finance", today.minusDays(2), -2, dayLabelFor(-2), "", 1_000L)
+            EventUi(1, "Alpha", DEFAULT_CATEGORY_ID, "Personal", today.plusDays(10), 10, dayLabelFor(10), "", 4_000L),
+            EventUi(2, "Bravo", WORK_CATEGORY_ID, "Work", today.plusDays(5), 5, dayLabelFor(5), "", 3_000L),
+            EventUi(3, "Charlie", HEALTH_CATEGORY_ID, "Health", today, 0, dayLabelFor(0), "", 2_000L),
+            EventUi(4, "Delta", FINANCE_CATEGORY_ID, "Finance", today.minusDays(2), -2, dayLabelFor(-2), "", 1_000L)
         )
     }
 
@@ -71,7 +75,7 @@ class AdaptiveLayoutInstrumentedTest {
                 SimpleDayCounterTheme(darkTheme = false) {
                     MainScreenContent(
                         uiState = MainScreenUiState(events = sampleEvents(), hasAnyEvents = true),
-                        categories = defaultCategories,
+                        categories = DEFAULT_CATEGORIES,
                         isVibrationEnabled = false,
                         snackbarHostState = remember { SnackbarHostState() },
                         onOpenSettings = {},
@@ -116,7 +120,7 @@ class AdaptiveLayoutInstrumentedTest {
                 SimpleDayCounterTheme(darkTheme = false) {
                     MainScreenContent(
                         uiState = MainScreenUiState(events = sampleEvents(), hasAnyEvents = true),
-                        categories = defaultCategories,
+                        categories = DEFAULT_CATEGORIES,
                         isVibrationEnabled = false,
                         snackbarHostState = remember { SnackbarHostState() },
                         onOpenSettings = {},
@@ -166,7 +170,7 @@ class AdaptiveLayoutInstrumentedTest {
                 SimpleDayCounterTheme(darkTheme = false) {
                     MainScreenContent(
                         uiState = MainScreenUiState(events = sampleEvents(), hasAnyEvents = true),
-                        categories = defaultCategories,
+                        categories = DEFAULT_CATEGORIES,
                         isVibrationEnabled = false,
                         snackbarHostState = remember { SnackbarHostState() },
                         onOpenSettings = {},
@@ -210,9 +214,9 @@ class AdaptiveLayoutInstrumentedTest {
                     ) {
                         AddEventBottomSheet(
                             state = EventFormState.defaultNew(),
-                            customCategories = emptySet(),
+                            categories = DEFAULT_CATEGORIES,
                             onStateChange = {},
-                            onAddCustomCategory = {},
+                            onAddCustomCategory = { null },
                             onDismiss = {},
                             onSave = {}
                         )
@@ -249,9 +253,9 @@ class AdaptiveLayoutInstrumentedTest {
                     ) {
                         AddEventBottomSheet(
                             state = EventFormState.defaultNew(),
-                            customCategories = emptySet(),
+                            categories = DEFAULT_CATEGORIES,
                             onStateChange = {},
-                            onAddCustomCategory = {},
+                            onAddCustomCategory = { null },
                             onDismiss = {},
                             onSave = {}
                         )

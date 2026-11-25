@@ -1,10 +1,10 @@
 package com.happypuppy.daycounter.ui.components
 
 import androidx.compose.runtime.saveable.SaverScope
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.util.isSingleGrapheme
-import com.happypuppy.daycounter.util.localDateToNoonDate
-import com.happypuppy.daycounter.util.todayAtNoon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -20,7 +20,6 @@ class EventFormStateTest {
 
     private val scope = SaverScope { true }
 
-    private val chicago = ZoneId.of("America/Chicago")
     private val utc = ZoneId.of("UTC")
     private val tokyo = ZoneId.of("Asia/Tokyo")
 
@@ -31,27 +30,13 @@ class EventFormStateTest {
     }
 
     @Test
-    fun `localDateToNoonDate anchors at 12_00 local time across timezones`() {
-        val date = LocalDate.of(2026, 7, 4)
-        for (zone in listOf(chicago, utc, tokyo)) {
-            val anchored = localDateToNoonDate(date, zone)
-            val zoned = Instant.ofEpochMilli(anchored.time).atZone(zone)
-            assertEquals("date mismatch in $zone", date, zoned.toLocalDate())
-            assertEquals("hour should be 12 in $zone", 12, zoned.hour)
-            assertEquals("minute should be 0 in $zone", 0, zoned.minute)
-        }
-    }
-
-    @Test
-    fun `todayAtNoon uses fixed clock date and zone anchored at 12_00`() {
+    fun `defaultNew uses fixed clock date in clock zone`() {
         val instant = Instant.parse("2026-11-25T23:30:00Z")
-        // In Tokyo (+9), 2026-11-25T23:30Z is already 2026-11-26 08:30 JST.
+        // In Tokyo (+9), 2026-11-25T23:30Z is already 2026-11-26.
         val tokyoClock = Clock.fixed(instant, tokyo)
-        val todayTokyo = todayAtNoon(tokyoClock)
-        val zoned = Instant.ofEpochMilli(todayTokyo.time).atZone(tokyo)
-        assertEquals(LocalDate.of(2026, 11, 26), zoned.toLocalDate())
-        assertEquals(12, zoned.hour)
-        assertEquals(0, zoned.minute)
+        val state = EventFormState.defaultNew(tokyoClock)
+        assertEquals(LocalDate.of(2026, 11, 26), state.targetDate)
+        assertEquals(DEFAULT_CATEGORY_ID, state.selectedCategoryId)
     }
 
     @Test
@@ -131,7 +116,7 @@ class EventFormStateTest {
     }
 
     @Test
-    fun `quick date presets resolve to noon-anchored dates`() {
+    fun `quick date presets resolve to exact LocalDate offsets`() {
         val today = LocalDate.of(2026, 6, 15)
         val expectedDates = mapOf(
             QuickDatePreset.TODAY to LocalDate.of(2026, 6, 15),
@@ -141,11 +126,7 @@ class EventFormStateTest {
         )
 
         for ((preset, expectedLocalDate) in expectedDates) {
-            val resolved = preset.resolveDate(today, chicago)
-            val zoned = Instant.ofEpochMilli(resolved.time).atZone(chicago)
-            assertEquals("date mismatch for $preset", expectedLocalDate, zoned.toLocalDate())
-            assertEquals("hour should be 12 for $preset", 12, zoned.hour)
-            assertEquals("minute should be 0 for $preset", 0, zoned.minute)
+            assertEquals("date mismatch for $preset", expectedLocalDate, preset.resolveDate(today))
         }
     }
 
@@ -155,14 +136,14 @@ class EventFormStateTest {
         val defaultState = EventFormState.defaultNew(fixedClock)
         assertEquals("", defaultState.name)
         assertEquals("", defaultState.emoji)
-        assertEquals(localDateToNoonDate(LocalDate.of(2026, 8, 10), utc), defaultState.targetDate)
-        assertEquals(defaultCategories.first(), defaultState.selectedCategory)
+        assertEquals(LocalDate.of(2026, 8, 10), defaultState.targetDate)
+        assertEquals(DEFAULT_CATEGORY_ID, defaultState.selectedCategoryId)
 
-        val target = localDateToNoonDate(LocalDate.of(2026, 12, 25), utc)
+        val target = LocalDate.of(2026, 12, 25)
         val item = Item(
             id = 7,
             name = "Holiday",
-            itemCategory = "Family",
+            categoryId = "family-uuid",
             createdAt = Date(1_000L),
             targetDate = target,
             emoji = "\uD83C\uDF89"
@@ -171,39 +152,39 @@ class EventFormStateTest {
         assertEquals("Holiday", fromItem.name)
         assertEquals("\uD83C\uDF89", fromItem.emoji)
         assertEquals(target, fromItem.targetDate)
-        assertEquals("Family", fromItem.selectedCategory)
+        assertEquals("family-uuid", fromItem.selectedCategoryId)
     }
 
     @Test
     fun `EventFormStateSaver round-trips populated and default states`() {
         val defaultState = EventFormState(
-            targetDate = localDateToNoonDate(LocalDate.of(2026, 6, 15), utc)
+            targetDate = LocalDate.of(2026, 6, 15)
         )
         assertEquals(defaultState, roundTrip(defaultState))
 
         val populated = EventFormState(
             name = "Anniversary",
             emoji = "\u2764\uFE0F",
-            targetDate = localDateToNoonDate(LocalDate.of(2026, 9, 1), utc),
-            selectedCategory = "Fitness Goals"
+            targetDate = LocalDate.of(2026, 9, 1),
+            selectedCategoryId = "fitness-uuid"
         )
         assertEquals(populated, roundTrip(populated))
     }
 
     @Test
     fun `EventFormStateSaver saved form uses Bundle-friendly primitives`() {
-        val date = localDateToNoonDate(LocalDate.of(2026, 9, 1), utc)
+        val date = LocalDate.of(2026, 9, 1)
         val saved = with(EventFormStateSaver) {
             scope.save(
                 EventFormState(
                     name = "Trip",
                     emoji = "\u2708\uFE0F",
                     targetDate = date,
-                    selectedCategory = "Work"
+                    selectedCategoryId = WORK_CATEGORY_ID
                 )
             )
         } as List<*>
-        assertEquals(listOf("Trip", "\u2708\uFE0F", date.time, "Work"), saved)
+        assertEquals(listOf("Trip", "\u2708\uFE0F", "2026-09-01", WORK_CATEGORY_ID), saved)
     }
 
     @Test
@@ -212,18 +193,18 @@ class EventFormStateTest {
         assertNotNull(emptyRestored)
         assertEquals("", emptyRestored!!.name)
         assertEquals("", emptyRestored.emoji)
-        assertEquals(defaultCategories.first(), emptyRestored.selectedCategory)
+        assertEquals(DEFAULT_CATEGORY_ID, emptyRestored.selectedCategoryId)
 
         val shortRestored = EventFormStateSaver.restore(listOf("Partial"))
         assertNotNull(shortRestored)
         assertEquals("Partial", shortRestored!!.name)
         assertEquals("", shortRestored.emoji)
-        assertEquals(defaultCategories.first(), shortRestored.selectedCategory)
+        assertEquals(DEFAULT_CATEGORY_ID, shortRestored.selectedCategoryId)
 
-        val wrongTypesRestored = EventFormStateSaver.restore(listOf(42, "ab", "not-a-timestamp", ""))
+        val wrongTypesRestored = EventFormStateSaver.restore(listOf(42, "ab", "not-a-date", ""))
         assertNotNull(wrongTypesRestored)
         assertEquals("", wrongTypesRestored!!.name)
         assertEquals("", wrongTypesRestored.emoji)
-        assertEquals(defaultCategories.first(), wrongTypesRestored.selectedCategory)
+        assertEquals(DEFAULT_CATEGORY_ID, wrongTypesRestored.selectedCategoryId)
     }
 }

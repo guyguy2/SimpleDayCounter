@@ -22,6 +22,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
+import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.EventFormState
@@ -57,7 +59,8 @@ class KeyboardNavigationInstrumentedTest {
     private fun sampleEvent(name: String = "Keyboard Event"): EventUi = EventUi(
         id = 7,
         name = name,
-        category = "Work",
+        categoryId = WORK_CATEGORY_ID,
+        categoryName = "Work",
         targetDate = LocalDate.of(2026, 6, 20),
         daysLeft = 5,
         dayLabel = dayLabelFor(5),
@@ -155,9 +158,9 @@ class KeyboardNavigationInstrumentedTest {
                     ) {
                         AddEventBottomSheet(
                             state = formState,
-                            customCategories = emptySet(),
+                            categories = DEFAULT_CATEGORIES,
                             onStateChange = { formState = it },
-                            onAddCustomCategory = {},
+                            onAddCustomCategory = { null },
                             onDismiss = {
                                 dismissedCount++
                                 open = false
@@ -200,9 +203,9 @@ class KeyboardNavigationInstrumentedTest {
                     ) {
                         AddEventBottomSheet(
                             state = formState,
-                            customCategories = emptySet(),
+                            categories = DEFAULT_CATEGORIES,
                             onStateChange = { formState = it },
-                            onAddCustomCategory = {},
+                            onAddCustomCategory = { null },
                             onDismiss = {
                                 dismissedCount++
                                 open = false

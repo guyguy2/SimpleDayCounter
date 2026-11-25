@@ -34,6 +34,8 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.MainActivity
 import com.happypuppy.daycounter.data.database.AppDatabase
+import com.happypuppy.daycounter.data.database.CategoryDao
+import com.happypuppy.daycounter.data.database.CategoryRepository
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.screens.FilterOption
@@ -86,6 +88,7 @@ class MainFlowInstrumentedTest {
         store.setDynamicColor(false)
         store.setSortOption(SortOption.DATE_ADDED_DESC)
         store.setFilterState(FilterState())
+        koin.get<CategoryRepository>().ensureInitialized()
     }
 
     /**
@@ -516,10 +519,10 @@ class MainFlowInstrumentedTest {
         rule.onNodeWithText("Save Event").performClick()
         rule.waitUntilExactlyOneExists(hasText("Marathon"), timeoutMillis = 5_000)
 
-        val store = koin.get<DataStoreManager>()
+        val categoryDao = koin.get<CategoryDao>()
         rule.waitUntil(timeoutMillis = 5_000) {
             runBlocking(Dispatchers.IO) {
-                "Fitness Goals" in store.customCategoriesFlow.first()
+                categoryDao.findByNameIgnoreCase("Fitness Goals") != null
             }
         }
     }
@@ -557,5 +560,99 @@ class MainFlowInstrumentedTest {
 
         rule.waitUntilExactlyOneExists(hasText("Birthday"), timeoutMillis = 5_000)
         rule.onNodeWithText("\uD83C\uDF82").assertExists()
+    }
+
+    @Test
+    fun deletingInUseCustomCategoryShowsUsageCountReassignsToPersonalAndUndoRestores() {
+        openAddSheet()
+        rule.onNodeWithText("Event Name").performTextInput("Tokyo Flight")
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom\u2026").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
+        rule.onNodeWithText("New Category").performTextInput("travel")
+        rule.onNodeWithText("Add").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Save Event").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Tokyo Flight"), timeoutMillis = 5_000)
+
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Manage Categories"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Manage Categories").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+        rule.onNodeWithText("1 event").assertExists()
+
+        rule.onNodeWithContentDescription("Delete Category").performClick()
+        rule.waitUntilExactlyOneExists(
+            hasText("\"Travel\" is used by 1 event. Deleting it will move that event to Personal."),
+            timeoutMillis = 5_000
+        )
+        rule.onNodeWithText("Delete").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("\"Travel\" deleted"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Travel").assertDoesNotExist()
+        rule.onNodeWithText("Undo").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+        rule.onNodeWithText("1 event").assertExists()
+
+        // Delete again and confirm events are reassigned to Personal on the main screen.
+        rule.onNodeWithContentDescription("Delete Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Delete"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Delete").performClick()
+        rule.waitUntilExactlyOneExists(hasText("\"Travel\" deleted"), timeoutMillis = 5_000)
+
+        rule.onNodeWithContentDescription("Back").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Settings"), timeoutMillis = 5_000)
+        rule.onNodeWithContentDescription("Back").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Tokyo Flight"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Personal").assertExists()
+    }
+
+    @Test
+    fun deleteAllCustomCategoriesShowsTotalUsageCountReassignsAndUndoRestores() {
+        openAddSheet()
+        rule.onNodeWithText("Event Name").performTextInput("Flight")
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom\u2026").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
+        rule.onNodeWithText("New Category").performTextInput("travel")
+        rule.onNodeWithText("Add").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Save Event").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Flight"), timeoutMillis = 5_000)
+
+        openAddSheet()
+        rule.onNodeWithText("Event Name").performTextInput("Novel")
+        fieldNode("Category").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Add Custom\u2026").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
+        rule.onNodeWithText("New Category").performTextInput("books")
+        rule.onNodeWithText("Add").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Books"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Save Event").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Novel"), timeoutMillis = 5_000)
+
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Manage Categories"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Manage Categories").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+
+        rule.onNodeWithContentDescription("Delete All Categories").performClick()
+        rule.waitUntilExactlyOneExists(
+            hasText("Delete all custom categories? 2 events will be moved to Personal."),
+            timeoutMillis = 5_000
+        )
+        rule.onNodeWithText("Delete All").performClick()
+
+        rule.waitUntilExactlyOneExists(hasText("All custom categories deleted"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Travel").assertDoesNotExist()
+        rule.onNodeWithText("Books").assertDoesNotExist()
+
+        rule.onNodeWithText("Undo").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
+        rule.onNodeWithText("Books").assertExists()
     }
 }
