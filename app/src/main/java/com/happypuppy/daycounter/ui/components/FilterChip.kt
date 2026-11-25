@@ -25,7 +25,11 @@ import com.happypuppy.daycounter.ui.screens.FilterOption
 import com.happypuppy.daycounter.ui.screens.FilterState
 
 @Composable
-fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
+fun FilterChip(
+    filterState: FilterState,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val filterText = when (filterState.option) {
         FilterOption.ALL -> return // No chip for ALL filter
         FilterOption.FUTURE -> stringResource(R.string.filter_future)
@@ -35,7 +39,7 @@ fun FilterChip(filterState: FilterState, onClear: () -> Unit) {
     }
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth(),
         color = MaterialTheme.colorScheme.primaryContainer,

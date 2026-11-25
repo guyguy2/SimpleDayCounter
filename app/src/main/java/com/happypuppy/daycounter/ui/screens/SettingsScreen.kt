@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -73,6 +75,7 @@ import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.data.preferences.formatDate
+import com.happypuppy.daycounter.ui.layout.ADAPTIVE_CONTENT_MAX_WIDTH
 import com.happypuppy.daycounter.util.AppVersionInfo
 import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.launch
@@ -97,45 +100,52 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.TopCenter
         ) {
-            SettingsSectionHeader(stringResource(R.string.settings_section_appearance))
+            Column(
+                modifier = Modifier
+                    .widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                SettingsSectionHeader(stringResource(R.string.settings_section_appearance))
 
-            ThemeSelector(dataStoreManager)
+                ThemeSelector(dataStoreManager)
 
-            DynamicColorSetting(dataStoreManager)
+                DynamicColorSetting(dataStoreManager)
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            SettingsSectionHeader(stringResource(R.string.settings_section_general))
+                SettingsSectionHeader(stringResource(R.string.settings_section_general))
 
-            VibrationSetting(dataStoreManager)
+                VibrationSetting(dataStoreManager)
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            SettingsSectionHeader(stringResource(R.string.settings_section_dates))
+                SettingsSectionHeader(stringResource(R.string.settings_section_dates))
 
-            DateFormatSetting(dataStoreManager)
+                DateFormatSetting(dataStoreManager)
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            SettingsSectionHeader(stringResource(R.string.settings_section_categories))
+                SettingsSectionHeader(stringResource(R.string.settings_section_categories))
 
-            CategoryManagementSetting(onOpenCategories)
+                CategoryManagementSetting(onOpenCategories)
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            SettingsSectionHeader(stringResource(R.string.settings_section_support))
+                SettingsSectionHeader(stringResource(R.string.settings_section_support))
 
-            RateAppSetting()
+                RateAppSetting()
 
-            AboutSetting(onClick = { showAboutDialog = true })
+                AboutSetting(onClick = { showAboutDialog = true })
+            }
         }
 
         if (showAboutDialog) {

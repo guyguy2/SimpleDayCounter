@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,7 +34,6 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
@@ -57,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,6 +75,7 @@ import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EmptyEventsState
+import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.EventFormState
 import com.happypuppy.daycounter.ui.components.EventFormStateSaver
 import com.happypuppy.daycounter.ui.components.FilterChip
@@ -78,14 +83,23 @@ import com.happypuppy.daycounter.ui.components.FilterMenu
 import com.happypuppy.daycounter.ui.components.SortMenu
 import com.happypuppy.daycounter.ui.components.SwipeToDeleteItem
 import com.happypuppy.daycounter.ui.components.defaultCategories
+import com.happypuppy.daycounter.ui.layout.ADAPTIVE_CONTENT_MAX_WIDTH
+import com.happypuppy.daycounter.ui.layout.ADAPTIVE_GRID_MIN_CELL_WIDTH
+import com.happypuppy.daycounter.ui.layout.AdaptiveEventFormContainer
+import com.happypuppy.daycounter.ui.layout.AdaptiveLayoutSpec
+import com.happypuppy.daycounter.ui.layout.rememberAdaptiveLayoutSpec
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.DayLabel
+import com.happypuppy.daycounter.util.vibrate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import java.time.LocalDate
+
+internal const val MAIN_EVENT_LIST_TAG = "main_event_list"
+internal const val MAIN_EVENT_GRID_TAG = "main_event_grid"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +108,7 @@ fun MainScreen(
     viewModel: EventViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val layoutSpec = rememberAdaptiveLayoutSpec()
     val snackbarHostState = remember { SnackbarHostState() }
     val addSheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -215,17 +230,19 @@ fun MainScreen(
         onSelectSortOption = viewModel::setSortOption,
         onSelectFilterState = viewModel::setFilterState,
         onClearFilter = viewModel::clearFilter,
-        onDismissError = viewModel::clearError
+        onDismissError = viewModel::clearError,
+        layoutSpec = layoutSpec
     )
 
-    // Add event sheet
+    // Add event sheet / adaptive wide dialog
     if (showAddEventSheet) {
-        ModalBottomSheet(
+        AdaptiveEventFormContainer(
+            useDialog = layoutSpec.useDialogForEventForm,
+            sheetState = addSheetState,
             onDismissRequest = {
                 showAddEventSheet = false
                 addFormState = EventFormState.defaultNew()
-            },
-            sheetState = addSheetState
+            }
         ) {
             AddEventBottomSheet(
                 state = addFormState,
@@ -252,14 +269,15 @@ fun MainScreen(
         }
     }
 
-    // Edit event sheet
+    // Edit event sheet / adaptive wide dialog
     if (showEditEventSheet && selectedItem != null) {
-        ModalBottomSheet(
+        AdaptiveEventFormContainer(
+            useDialog = layoutSpec.useDialogForEventForm,
+            sheetState = editSheetState,
             onDismissRequest = {
                 showEditEventSheet = false
                 selectedItemId = null
-            },
-            sheetState = editSheetState
+            }
         ) {
             EditEventScreen(
                 item = selectedItem,
@@ -296,7 +314,8 @@ fun MainScreenContent(
     onSelectSortOption: (SortOption) -> Unit,
     onSelectFilterState: (FilterState) -> Unit,
     onClearFilter: () -> Unit,
-    onDismissError: () -> Unit
+    onDismissError: () -> Unit,
+    layoutSpec: AdaptiveLayoutSpec = rememberAdaptiveLayoutSpec()
 ) {
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var showFilterMenu by rememberSaveable { mutableStateOf(false) }
@@ -382,6 +401,7 @@ fun MainScreenContent(
         }
     ) { innerPadding ->
         val layoutDirection = LocalLayoutDirection.current
+        val context = LocalContext.current
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -392,12 +412,14 @@ fun MainScreenContent(
                 )
         ) {
             Column(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Error banner if any database operation failed
                 uiState.error?.let { error ->
                     Surface(
                         modifier = Modifier
+                            .widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -427,11 +449,12 @@ fun MainScreenContent(
                 if (filterState.option != FilterOption.ALL) {
                     FilterChip(
                         filterState = filterState,
-                        onClear = onClearFilter
+                        onClear = onClearFilter,
+                        modifier = Modifier.widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
                     )
                 }
 
-                // Show loading, empty state, or event list
+                // Show loading, empty state, or adaptive event list / grid
                 when {
                     uiState.isLoading && !uiState.hasAnyEvents -> {
                         Box(
@@ -458,9 +481,56 @@ fun MainScreenContent(
                         )
                     }
 
+                    layoutSpec.useGrid -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = ADAPTIVE_GRID_MIN_CELL_WIDTH),
+                            modifier = Modifier
+                                .widthIn(max = ADAPTIVE_CONTENT_MAX_WIDTH)
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .testTag(MAIN_EVENT_GRID_TAG),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = innerPadding.calculateBottomPadding() + 88.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(
+                                items = uiState.events,
+                                key = { event -> "${event.id}_${event.restoreVersion}" }
+                            ) { event ->
+                                // Multi-column grids disable horizontal swipe-to-dismiss so cells
+                                // stay uncluttered; edit sheet Delete, hardware Delete key, and
+                                // TalkBack custom Delete action remain available.
+                                var deleteDispatched by remember(event.id, event.restoreVersion) {
+                                    mutableStateOf(false)
+                                }
+                                val deleteOnce = {
+                                    if (!deleteDispatched) {
+                                        deleteDispatched = true
+                                        if (isVibrationEnabled) {
+                                            vibrate(context)
+                                        }
+                                        onDeleteEvent(event.id)
+                                    }
+                                }
+                                EventCard(
+                                    event = event,
+                                    onClick = { onEditEvent(event.id) },
+                                    onDelete = deleteOnce
+                                )
+                            }
+                        }
+                    }
+
                     else -> {
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag(MAIN_EVENT_LIST_TAG),
                             contentPadding = PaddingValues(
                                 start = 16.dp,
                                 end = 16.dp,
@@ -620,6 +690,35 @@ private fun MainScreenPopulatedDarkPreview() {
             onSelectFilterState = {},
             onClearFilter = {},
             onDismissError = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 900, heightDp = 600)
+@Composable
+private fun MainScreenTabletLightPreview() {
+    SimpleDayCounterTheme(darkTheme = false) {
+        MainScreenContent(
+            uiState = MainScreenUiState(
+                events = previewEvents(),
+                hasAnyEvents = true
+            ),
+            categories = defaultCategories,
+            isVibrationEnabled = true,
+            snackbarHostState = remember { SnackbarHostState() },
+            onOpenSettings = {},
+            onAddEvent = {},
+            onEditEvent = {},
+            onDeleteEvent = {},
+            onSelectSortOption = {},
+            onSelectFilterState = {},
+            onClearFilter = {},
+            onDismissError = {},
+            layoutSpec = AdaptiveLayoutSpec(
+                useGrid = true,
+                enableSwipeToDelete = false,
+                useDialogForEventForm = true
+            )
         )
     }
 }
