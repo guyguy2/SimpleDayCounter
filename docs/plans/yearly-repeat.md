@@ -1,8 +1,43 @@
 # Plan: yearly repeating events
 
-Status: planned, not started. Written 2026-11-25 on `main` after the W7 merge (`1505b96`).
-Implement on a new branch from `main` (suggested name `feat/yearly-repeat`), never directly on `main`:
+Status: planned, not started. Written 2026-11-25 after the W7 merge (`1505b96`).
+Implement on a new branch from `main` (`feat/yearly-repeat`), never directly on `main`:
 every push to `main` runs `release-internal.yml` and publishes to the Play internal track.
+
+## Instructions for the implementing session
+
+Read this whole file and `AGENTS.md` first, then implement the plan.
+
+Setup
+- Branch `feat/yearly-repeat` from `main`. Never commit to `main` and never push `main`.
+- Do not push any branch or open a PR until the owner says so.
+
+Scope and conduct
+- Yearly repeat only. The 7 decisions below are final; do not re-litigate them.
+- "Open details" lists the owner's defaults. Use them unless you find a concrete problem, and say so
+  if you deviate.
+- Make minimal, focused changes. Do not touch unrelated code. The unused `Item`-based `filterItems`
+  and `sortItems` helpers stay as they are.
+- No emojis and no em dashes in code, comments, docs or commit messages.
+
+Rules from `AGENTS.md` that matter here
+- Room: explicit `MIGRATION_5_6`, registered in `AppModule`, with the committed `6.json` schema.
+- Strings: all UI text in `res/values/strings.xml`; `StringLiteralGuardTest` must pass.
+- Write the tests listed under "Tests" alongside each step.
+- Update `AGENTS.md` at the end (database version, migrations, form and card notes).
+
+Verification
+- Run `./gradlew testDebugUnitTest lintDebug assembleDebug` and report the results.
+- Instrumented tests run only on an emulator and always with an explicit device
+  (`adb -s emulator-5554 ...`). Never a bare `adb`, never `connectedDebugAndroidTest`, never a
+  personal device. Reset any locale or animation settings afterwards.
+
+Commits
+- Small commits with plain subjects, since they feed the Play release notes (for example "Add yearly
+  repeat for birthdays and anniversaries"). End each commit message with:
+  `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
+
+When done, summarize what changed per plan step, the test results, and any deviation from the plan.
 
 ## Context
 
