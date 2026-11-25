@@ -24,16 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -60,8 +56,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,7 +69,6 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,47 +79,12 @@ import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.FilterChip
-import com.happypuppy.daycounter.ui.components.categoryDisplayName
+import com.happypuppy.daycounter.ui.components.FilterMenu
+import com.happypuppy.daycounter.ui.components.SortMenu
 import com.happypuppy.daycounter.ui.components.defaultCategories
-import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.vibrate
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
-
-enum class SortOption {
-    NAME_ASC, NAME_DESC,
-    TARGET_DATE_ASC, TARGET_DATE_DESC,
-    DATE_ADDED_ASC, DATE_ADDED_DESC,
-    CATEGORY_ASC, CATEGORY_DESC
-}
-
-// Define filter options
-enum class FilterOption {
-    ALL,           // Show all events
-    FUTURE,        // Show only future events
-    TODAY,         // Show only today's events
-    PAST,          // Show only past events
-    CATEGORY       // Show events of a specific category
-}
-
-// Data class to hold the current filter state
-data class FilterState(
-    val option: FilterOption = FilterOption.ALL,
-    val category: String? = null // Used when option is CATEGORY
-)
-
-/** Lets [FilterState] live directly in `rememberSaveable` (enum stored by name). */
-val FilterStateSaver: Saver<FilterState, Any> = mapSaver(
-    save = { mapOf(FILTER_OPTION_KEY to it.option.name, FILTER_CATEGORY_KEY to it.category) },
-    restore = {
-        FilterState(
-            option = FilterOption.valueOf(it[FILTER_OPTION_KEY] as String),
-            category = it[FILTER_CATEGORY_KEY] as String?
-        )
-    }
-)
-private const val FILTER_OPTION_KEY = "option"
-private const val FILTER_CATEGORY_KEY = "category"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,18 +128,7 @@ fun MainScreen(
 
     // Sort items based on selected option (case-insensitive for name/category)
     val filteredAndSortedItems = remember(uiState.items, selectedSortOption, filterState) {
-        val filteredItems = filterItems(uiState.items, filterState)
-
-        when (selectedSortOption) {
-            SortOption.NAME_ASC -> filteredItems.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-            SortOption.NAME_DESC -> filteredItems.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.name })
-            SortOption.TARGET_DATE_ASC -> filteredItems.sortedBy { it.targetDate }
-            SortOption.TARGET_DATE_DESC -> filteredItems.sortedByDescending { it.targetDate }
-            SortOption.DATE_ADDED_ASC -> filteredItems.sortedBy { it.createdAt }
-            SortOption.DATE_ADDED_DESC -> filteredItems.sortedByDescending { it.createdAt }
-            SortOption.CATEGORY_ASC -> filteredItems.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
-            SortOption.CATEGORY_DESC -> filteredItems.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.itemCategory })
-        }
+        sortItems(filterItems(uiState.items, filterState), selectedSortOption)
     }
 
     // Get all category names (both default and custom); inject at screen root (P1-1)
@@ -231,108 +178,16 @@ fun MainScreen(
                             contentDescription = stringResource(R.string.main_filter)
                         )
 
-                        DropdownMenu(
+                        FilterMenu(
                             expanded = showFilterMenu,
-                            onDismissRequest = { showFilterMenu = false }
-                        ) {
-                            Text(
-                                text = stringResource(R.string.filter_by),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.filter_all)) },
-                                onClick = {
-                                    filterState = FilterState(option = FilterOption.ALL)
-                                    showFilterMenu = false
-                                },
-                                trailingIcon = if (filterState.option == FilterOption.ALL) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.filter_future)) },
-                                onClick = {
-                                    filterState = FilterState(option = FilterOption.FUTURE)
-                                    showFilterMenu = false
-                                },
-                                trailingIcon = if (filterState.option == FilterOption.FUTURE) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.filter_today)) },
-                                onClick = {
-                                    filterState = FilterState(option = FilterOption.TODAY)
-                                    showFilterMenu = false
-                                },
-                                trailingIcon = if (filterState.option == FilterOption.TODAY) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.filter_past)) },
-                                onClick = {
-                                    filterState = FilterState(option = FilterOption.PAST)
-                                    showFilterMenu = false
-                                },
-                                trailingIcon = if (filterState.option == FilterOption.PAST) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(stringResource(R.string.filter_by_category))
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = stringResource(R.string.main_show_categories)
-                                        )
-                                    }
-                                },
-                                onClick = { showCategoryFilterOptions = true },
-                                trailingIcon = if (filterState.option == FilterOption.CATEGORY) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showCategoryFilterOptions,
-                            onDismissRequest = { showCategoryFilterOptions = false }
-                        ) {
-                            allCategories.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(categoryDisplayName(category)) },
-                                    onClick = {
-                                        filterState = FilterState(
-                                            option = FilterOption.CATEGORY,
-                                            category = category
-                                        )
-                                        showCategoryFilterOptions = false
-                                        showFilterMenu = false
-                                    },
-                                    trailingIcon = if (filterState.option == FilterOption.CATEGORY &&
-                                        filterState.category == category
-                                    ) {
-                                        {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                contentDescription = stringResource(R.string.common_selected)
-                                            )
-                                        }
-                                    } else null
-                                )
-                            }
-                        }
+                            showCategoryOptions = showCategoryFilterOptions,
+                            filterState = filterState,
+                            categories = allCategories,
+                            onSelectFilter = { filterState = it },
+                            onDismiss = { showFilterMenu = false },
+                            onOpenCategories = { showCategoryFilterOptions = true },
+                            onDismissCategories = { showCategoryFilterOptions = false }
+                        )
                     }
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(
@@ -340,97 +195,12 @@ fun MainScreen(
                             contentDescription = stringResource(R.string.main_sort)
                         )
 
-                        DropdownMenu(
+                        SortMenu(
                             expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            Text(
-                                text = stringResource(R.string.main_sort_by),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_name_asc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.NAME_ASC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.NAME_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_name_desc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.NAME_DESC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.NAME_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_category_asc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.CATEGORY_ASC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.CATEGORY_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_category_desc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.CATEGORY_DESC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.CATEGORY_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_target_date_asc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.TARGET_DATE_ASC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.TARGET_DATE_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_target_date_desc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.TARGET_DATE_DESC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.TARGET_DATE_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_date_added_asc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.DATE_ADDED_ASC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.DATE_ADDED_ASC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.main_sort_date_added_desc)) },
-                                onClick = {
-                                    selectedSortOption = SortOption.DATE_ADDED_DESC
-                                    showSortMenu = false
-                                },
-                                trailingIcon = if (selectedSortOption == SortOption.DATE_ADDED_DESC) {
-                                    { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
-                                } else null
-                            )
-                        }
+                            selectedSortOption = selectedSortOption,
+                            onSelectOption = { selectedSortOption = it },
+                            onDismiss = { showSortMenu = false }
+                        )
                     }
 
                     IconButton(onClick = onOpenSettings) {
@@ -724,17 +494,5 @@ fun SwipeToDeleteItem(
         ) {
             EventCard(item = item, onClick = onClick, onDelete = deleteOnce)
         }
-    }
-}
-
-fun filterItems(items: List<Item>, filterState: FilterState): List<Item> {
-    return when (filterState.option) {
-        FilterOption.ALL -> items
-        FilterOption.FUTURE -> items.filter { calculateDaysLeft(it.targetDate) > 0 }
-        FilterOption.TODAY -> items.filter { calculateDaysLeft(it.targetDate) == 0 }
-        FilterOption.PAST -> items.filter { calculateDaysLeft(it.targetDate) < 0 }
-        FilterOption.CATEGORY -> filterState.category?.let { category ->
-            items.filter { it.itemCategory == category }
-        } ?: items // If category is null, show all items
     }
 }
