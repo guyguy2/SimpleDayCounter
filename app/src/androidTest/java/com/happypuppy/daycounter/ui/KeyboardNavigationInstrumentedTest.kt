@@ -7,7 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.view.KeyEvent
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.happypuppy.daycounter.ui.components.AddEventBottomSheet
 import com.happypuppy.daycounter.ui.components.EventCard
 import com.happypuppy.daycounter.ui.components.EventFormState
@@ -25,6 +29,7 @@ import com.happypuppy.daycounter.ui.layout.AdaptiveEventFormContainer
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
 import com.happypuppy.daycounter.util.dayLabelFor
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -44,6 +49,11 @@ class KeyboardNavigationInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
+    @After
+    fun restoreTouchMode() {
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
+    }
+
     private fun sampleEvent(name: String = "Keyboard Event"): EventUi = EventUi(
         id = 7,
         name = name,
@@ -57,9 +67,13 @@ class KeyboardNavigationInstrumentedTest {
 
     @Test
     fun enterAndDpadCenterOnFocusedEventCardTriggerEdit() {
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
         var editCount = 0
         var deleteCount = 0
+        var requestKeyboardMode: (() -> Unit)? = null
         rule.setContent {
+            val inputModeManager = LocalInputModeManager.current
+            requestKeyboardMode = { inputModeManager.requestInputMode(InputMode.Keyboard) }
             SimpleDayCounterTheme(darkTheme = false) {
                 EventCard(
                     event = sampleEvent(),
@@ -69,6 +83,9 @@ class KeyboardNavigationInstrumentedTest {
             }
         }
 
+        rule.runOnIdle { requestKeyboardMode?.invoke() }
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_TAB)
+        rule.waitForIdle()
         val card = rule.onNodeWithText("Keyboard Event")
         card.performSemanticsAction(SemanticsActions.RequestFocus)
         card.assertIsFocused()
@@ -89,9 +106,13 @@ class KeyboardNavigationInstrumentedTest {
 
     @Test
     fun deleteKeyOnFocusedEventCardTriggersDelete() {
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
         var editCount = 0
         var deleteCount = 0
+        var requestKeyboardMode: (() -> Unit)? = null
         rule.setContent {
+            val inputModeManager = LocalInputModeManager.current
+            requestKeyboardMode = { inputModeManager.requestInputMode(InputMode.Keyboard) }
             SimpleDayCounterTheme(darkTheme = false) {
                 EventCard(
                     event = sampleEvent("Delete Me"),
@@ -101,6 +122,9 @@ class KeyboardNavigationInstrumentedTest {
             }
         }
 
+        rule.runOnIdle { requestKeyboardMode?.invoke() }
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_TAB)
+        rule.waitForIdle()
         val card = rule.onNodeWithText("Delete Me")
         card.performSemanticsAction(SemanticsActions.RequestFocus)
         card.assertIsFocused()

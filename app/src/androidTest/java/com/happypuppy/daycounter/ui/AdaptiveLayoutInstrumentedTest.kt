@@ -198,10 +198,8 @@ class AdaptiveLayoutInstrumentedTest {
 
     @Test
     fun wideWindowPresentsAddEventInCenteredDialogCappedAt560Dp() {
-        var overriddenDensity = 1f
         rule.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.WindowSize(DpSize(840.dp, 900.dp))) {
-                overriddenDensity = LocalDensity.current.density
                 SimpleDayCounterTheme(darkTheme = false) {
                     val layoutSpec = rememberAdaptiveLayoutSpec()
                     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Expanded)
@@ -223,12 +221,14 @@ class AdaptiveLayoutInstrumentedTest {
             }
         }
 
-        rule.onNodeWithTag(ADAPTIVE_EVENT_FORM_DIALOG_TAG).assertExists()
+        val dialogNode = rule.onNodeWithTag(ADAPTIVE_EVENT_FORM_DIALOG_TAG)
+            .assertExists()
+            .fetchSemanticsNode()
         rule.onNodeWithTag(ADAPTIVE_EVENT_FORM_SHEET_TAG).assertDoesNotExist()
         rule.onNodeWithText("Add New Event").assertExists()
 
-        val dialogWidthDp = rule.onNodeWithTag(ADAPTIVE_EVENT_FORM_DIALOG_TAG)
-            .fetchSemanticsNode().boundsInRoot.width / overriddenDensity
+        // Dialog opens in its own Android window, so normalize pixels by the dialog's own density.
+        val dialogWidthDp = dialogNode.boundsInRoot.width / dialogNode.layoutInfo.density.density
         assertTrue(
             "Wide event form dialog ($dialogWidthDp dp) must be capped at <= 560dp",
             dialogWidthDp <= 561f
