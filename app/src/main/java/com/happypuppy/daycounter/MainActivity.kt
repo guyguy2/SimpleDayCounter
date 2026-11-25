@@ -15,30 +15,35 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.happypuppy.daycounter.data.preferences.AppTheme
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
-import com.happypuppy.daycounter.data.preferences.DateFormat
 import com.happypuppy.daycounter.navigation.AppNavigation
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
-import org.koin.compose.koinInject
+import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
+    private val dataStoreManager: DataStoreManager by inject()
+    private val startup = StartupSettings()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Must run before super.onCreate. The system splash stays up until the stored theme and
+        // date format are read, so the first Compose frame already uses them. A failed read
+        // resolves to the defaults (DataStoreManager.settingsFlow), so this cannot hang.
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { !startup.isResolved }
         enableEdgeToEdge()
         if (BuildConfig.DEBUG) Log.d("MainActivity", "onCreate: savedInstanceState = $savedInstanceState")
 
-        setContent {
-            val dataStoreManager = koinInject<DataStoreManager>()
-            val themePreference by dataStoreManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
-            val dateFormat by dataStoreManager.dateFormatFlow.collectAsState(initial = DateFormat.SYSTEM)
-            val isSystemInDarkTheme = isSystemInDarkTheme()
+        lifecycleScope.launch { startup.collectFrom(dataStoreManager.settingsFlow) }
 
-            val useDarkTheme = when (themePreference) {
-                AppTheme.SYSTEM_DEFAULT -> isSystemInDarkTheme
-                AppTheme.LIGHT -> false
-                AppTheme.DARK -> true
-            }
+        setContent {
+            val settings by startup.settings.collectAsState()
+            val resolved = settings ?: return@setContent
+            val isSystemInDarkTheme = isSystemInDarkTheme()
+            val useDarkTheme = resolved.theme.isDark(isSystemInDarkTheme)
 
             DisposableEffect(useDarkTheme) {
                 enableEdgeToEdge(
@@ -56,7 +61,8 @@ class MainActivity : ComponentActivity() {
 
             SimpleDayCounterTheme(
                 darkTheme = useDarkTheme,
-                dateFormat = dateFormat
+                dateFormat = resolved.dateFormat,
+                dynamicColor = resolved.dynamicColor
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

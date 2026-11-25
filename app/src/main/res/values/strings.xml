@@ -70,6 +70,8 @@
     <string name="settings_theme_system">System Default</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_description">Use colors from your wallpaper</string>
     <string name="settings_vibration">Vibration</string>
     <string name="settings_vibration_description">Vibrate when deleting an event</string>
     <string name="settings_rate_app">Rate App</string>
@@ -106,8 +108,6 @@
     <string name="category_mgmt_delete_cd">Delete Category</string>
     <string name="filter_chip_category">Category: %1$s</string>
     <string name="filter_clear">Clear Filter</string>
-    <string name="splash_logo_cd">App Logo</string>
-    <string name="splash_tagline">Track your important dates with ease</string>
     <string name="category_personal">Personal</string>
     <string name="category_work">Work</string>
     <string name="category_health">Health</string>

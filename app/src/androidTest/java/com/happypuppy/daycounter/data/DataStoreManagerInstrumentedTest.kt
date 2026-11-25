@@ -2,12 +2,15 @@ package com.happypuppy.daycounter.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.data.preferences.AppTheme
 import com.happypuppy.daycounter.data.preferences.DATE_FORMAT_KEY
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
 import com.happypuppy.daycounter.data.preferences.DateFormat
+import com.happypuppy.daycounter.data.preferences.SETTINGS_DATASTORE_NAME
+import com.happypuppy.daycounter.data.preferences.THEME_KEY
 import com.happypuppy.daycounter.data.preferences.dataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -35,7 +38,7 @@ class DataStoreManagerInstrumentedTest {
     @Before
     fun setUp() = runBlocking {
         context = ApplicationProvider.getApplicationContext<Context>()
-        manager = DataStoreManager(context)
+        manager = DataStoreManager(context.dataStore)
         savedTheme = manager.themeFlow.first()
         savedFormatValue = context.dataStore.data.first()[DATE_FORMAT_KEY]
         savedVibrate = manager.vibrateEnabledFlow.first()
@@ -80,6 +83,19 @@ class DataStoreManagerInstrumentedTest {
             context.dataStore.edit { it[DATE_FORMAT_KEY] = format.value }
             assertEquals(format, manager.dateFormatFlow.first())
         }
+    }
+
+    @Test
+    fun valueWrittenThroughTheContextDelegateIsReadByTheInjectedManager() = runBlocking {
+        // The Context.dataStore delegate is the pre-CQ-4 access path and still the one production
+        // injects, so there must be a single settings file: datastore/settings.preferences_pb.
+        context.dataStore.edit { it[THEME_KEY] = AppTheme.LIGHT.value }
+
+        assertEquals(AppTheme.LIGHT, manager.themeFlow.first())
+        assertEquals("settings", SETTINGS_DATASTORE_NAME)
+        val file = context.preferencesDataStoreFile(SETTINGS_DATASTORE_NAME)
+        assertEquals("settings.preferences_pb", file.name)
+        assertTrue(file.isFile)
     }
 
     @Test

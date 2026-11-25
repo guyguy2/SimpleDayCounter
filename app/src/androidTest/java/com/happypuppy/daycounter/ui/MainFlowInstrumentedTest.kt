@@ -7,6 +7,9 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
@@ -45,9 +48,9 @@ import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 /**
- * End-to-end Compose flows against the real app graph (Koin, Room, DataStore). The app starts on
- * a fixed 1500 ms splash, so every test first waits for the main screen. State is reset in
- * [setUp]/[tearDown]; run on an emulator because it clears the app database.
+ * End-to-end Compose flows against the real app graph (Koin, Room, DataStore). Every test first
+ * waits for the main screen. State is reset in [setUp]/[tearDown]; run on an emulator because it
+ * clears the app database.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -59,15 +62,9 @@ class MainFlowInstrumentedTest {
 
     private val koin get() = GlobalContext.get()
 
-    private companion object {
-        const val SPLASH_MS = 2_000L
-    }
-
     @Before
     fun setUp() {
         resetState()
-        // Splash pops itself after a fixed 1500 ms delay that runs on the test (virtual) clock.
-        rule.mainClock.advanceTimeBy(SPLASH_MS)
         rule.waitUntil(timeoutMillis = 15_000) {
             rule.onAllNodes(hasText("Add event"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
@@ -83,6 +80,7 @@ class MainFlowInstrumentedTest {
         val store = koin.get<DataStoreManager>()
         store.clearCustomCategories()
         store.setTheme(AppTheme.SYSTEM_DEFAULT)
+        store.setDynamicColor(false)
     }
 
     /**
@@ -403,6 +401,23 @@ class MainFlowInstrumentedTest {
             runBlocking(Dispatchers.IO) { koin.get<DataStoreManager>().themeFlow.first() } == AppTheme.DARK
         }
         rule.onNode(hasText("Dark") and isSelectable()).assertIsSelected()
+    }
+
+    @Test
+    fun dynamicColorSwitchIsOffByDefaultAndPersistsWhenTurnedOn() {
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Dynamic color"), timeoutMillis = 5_000)
+
+        val toggle = hasText("Dynamic color") and isToggleable()
+        rule.onNode(toggle).assertIsOff()
+        runBlocking(Dispatchers.IO) { assertEquals(false, koin.get<DataStoreManager>().dynamicColorFlow.first()) }
+
+        rule.onNode(toggle).performClick()
+
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) { koin.get<DataStoreManager>().dynamicColorFlow.first() }
+        }
+        rule.onNode(toggle).assertIsOn()
     }
 
     @Test

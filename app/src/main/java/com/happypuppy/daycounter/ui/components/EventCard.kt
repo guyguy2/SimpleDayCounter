@@ -45,12 +45,8 @@ import com.happypuppy.daycounter.R
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.theme.CategoryColors
-import com.happypuppy.daycounter.ui.theme.DarkCardPink
-import com.happypuppy.daycounter.ui.theme.DarkCardPurple
-import com.happypuppy.daycounter.ui.theme.DarkCardYellow
-import com.happypuppy.daycounter.ui.theme.DarkOnSurface
-import com.happypuppy.daycounter.ui.theme.DarkOnSurfaceVariant
 import com.happypuppy.daycounter.ui.theme.LocalDateFormat
+import com.happypuppy.daycounter.ui.theme.LocalEventCardColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.calculateDaysLeft
@@ -70,24 +66,12 @@ fun EventCard(
     val isDarkTheme = LocalIsDarkTheme.current
     val dateFormat = LocalDateFormat.current
 
-    // Calculate the appropriate background color based on days left and theme
-    val backgroundColor = if (isDarkTheme) {
-        when {
-            daysLeft < 0 -> DarkCardPink    // Past date
-            daysLeft == 0 -> DarkCardPurple // Today
-            else -> DarkCardYellow  // Future date
-        }
-    } else {
-        when {
-            daysLeft < 0 -> Color(0xFFFFF0F6) // Light Pink
-            daysLeft == 0 -> Color(0xFFF9F0FF) // Light Purple
-            else -> Color(0xFFFFFBE6) // Light Yellow
-        }
-    }
-
-    // Calculate text colors based on theme
-    val primaryTextColor = if (isDarkTheme) DarkOnSurface else MaterialTheme.colorScheme.onSurface
-    val secondaryTextColor = if (isDarkTheme) DarkOnSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant
+    // Container and text colors for this card's state come from the theme (brand tints, or dynamic
+    // color roles when that is on).
+    val stateColors = LocalEventCardColors.current.forDaysLeft(daysLeft)
+    val backgroundColor = stateColors.container
+    val primaryTextColor = stateColors.content
+    val secondaryTextColor = stateColors.contentVariant
 
     // Get category color
     val categoryColor = CategoryColors.getCategoryColor(item.itemCategory, isDarkTheme)
@@ -122,11 +106,7 @@ fun EventCard(
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
         ),
-        border = BorderStroke(
-            1.dp, if (isDarkTheme)
-                Color.DarkGray.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier

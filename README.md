@@ -60,18 +60,19 @@ Single-module MVVM + Repository pattern.
 
 ```
 app/src/main/java/com/happypuppy/daycounter/
-├── MainActivity.kt    # Entry point, edge-to-edge setup, theme & date-format collection
+├── MainActivity.kt    # Entry point, system splash, edge-to-edge setup, resolved theme & date format
+├── StartupSettings.kt # First resolved settings; releases the splash screen
 ├── MainApp.kt         # Application class initializing Koin
 ├── data/
 │   ├── database/      # Room Item entity, DAO, AppDatabase, ItemRepository
-│   ├── preferences/   # DataStoreManager (theme, vibration, date format, custom categories)
+│   ├── preferences/   # DataStoreManager (theme, dynamic color, vibration, date format, custom categories)
 │   └── repository/    # Room DateConverters
 ├── di/                # Koin module bindings
 ├── navigation/        # Type-safe @Serializable routes and NavHost
 ├── ui/
 │   ├── components/    # EventCard, BottomSheet (AddEventBottomSheet), CategorySelector, CategoryColorIndicator, AddCategoryInput, FilterChip
-│   ├── screens/       # MainScreen, EditEventScreen, SettingsScreen, CategoryManagementScreen, SplashScreen, EventViewModel
-│   └── theme/         # Material 3 Light/Dark themes and CategoryColors
+│   ├── screens/       # MainScreen, EditEventScreen, SettingsScreen, CategoryManagementScreen, EventViewModel
+│   └── theme/         # Material 3 Light/Dark/dynamic color themes, EventCardColors and CategoryColors
 └── util/              # DST-safe day count math, UTC DatePicker helpers, grapheme/emoji & color helpers
 ```
 
