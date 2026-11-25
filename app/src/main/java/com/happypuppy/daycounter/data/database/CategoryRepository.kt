@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
+import java.util.Locale
 import java.util.UUID
+
+private fun String.normalizedCategoryKey(): String = trim().lowercase(Locale.ROOT)
 
 interface TransactionRunner {
     suspend fun <T> run(block: suspend () -> T): T
@@ -91,22 +94,26 @@ class CategoryRepository(
                 val legacyCustomCategories = migrationPreferences.customCategoriesFlow.first()
                 val filterState = migrationPreferences.filterStateFlow.first()
                 transactionRunner.run {
+                    val existingByKey = categoryDao.getAllCategoriesList()
+                        .associateBy { it.name.normalizedCategoryKey() }
+                        .toMutableMap()
                     for (rawName in legacyCustomCategories) {
                         val trimmed = rawName.trim()
-                        if (trimmed.isNotEmpty() && categoryDao.findByNameIgnoreCase(trimmed) == null) {
-                            categoryDao.insertCategory(
-                                Category(
-                                    id = idGenerator(),
-                                    name = trimmed,
-                                    isDefault = false,
-                                    createdAt = clock.millis()
-                                )
+                        val key = trimmed.normalizedCategoryKey()
+                        if (trimmed.isNotEmpty() && key !in existingByKey) {
+                            val created = Category(
+                                id = idGenerator(),
+                                name = trimmed,
+                                isDefault = false,
+                                createdAt = clock.millis()
                             )
+                            categoryDao.insertCategory(created)
+                            existingByKey[key] = created
                         }
                     }
                     if (filterState.option == FilterOption.CATEGORY && !filterState.category.isNullOrBlank()) {
                         if (categoryDao.getCategoryById(filterState.category) == null) {
-                            val matched = categoryDao.findByNameIgnoreCase(filterState.category)
+                            val matched = existingByKey[filterState.category.normalizedCategoryKey()]
                             if (matched != null) {
                                 migrationPreferences.setFilterState(
                                     FilterState(option = FilterOption.CATEGORY, category = matched.id)
@@ -128,8 +135,10 @@ class CategoryRepository(
         ensureInitialized()
         val normalized = normalizeCategoryNameValue(rawName)
         if (normalized.isEmpty()) return AddCategoryResult.Invalid
+        val normalizedKey = normalized.normalizedCategoryKey()
         return transactionRunner.run {
-            val existing = categoryDao.findByNameIgnoreCase(normalized)
+            val existing = categoryDao.getAllCategoriesList()
+                .firstOrNull { it.name.normalizedCategoryKey() == normalizedKey }
             if (existing != null) {
                 AddCategoryResult.Duplicate(existing)
             } else {
@@ -185,17 +194,49 @@ class CategoryRepository(
         }
     }
 
-    suspend fun restoreDeletedCategories(snapshot: DeletedCategorySnapshot) {
+    /**
+     * Restores deleted categories and their item assignments inside a single transaction.
+     * If a category with the same case-folded name already exists (e.g., user re-added it
+     * before tapping Undo), items are merged into that existing category without creating
+     * a duplicate row. Returns a mapping from each snapshot category ID to the resolved
+     * active category ID in the database.
+     */
+    suspend fun restoreDeletedCategories(snapshot: DeletedCategorySnapshot): Map<String, String> {
         ensureInitialized()
-        transactionRunner.run {
-            categoryDao.insertCategories(snapshot.entries.map { it.category })
+        return transactionRunner.run {
+            val existing = categoryDao.getAllCategoriesList()
+            val existingById = existing.associateBy { it.id }.toMutableMap()
+            val existingByKey = existing.associateBy { it.name.normalizedCategoryKey() }.toMutableMap()
+            val idMapping = mutableMapOf<String, String>()
+            val toInsert = mutableListOf<Category>()
+            val itemReassignments = mutableListOf<Pair<List<Int>, String>>()
+
             for (entry in snapshot.entries) {
+                val key = entry.category.name.normalizedCategoryKey()
+                val matchedExisting = existingById[entry.category.id] ?: existingByKey[key]
+                val targetCategoryId = if (matchedExisting != null) {
+                    matchedExisting.id
+                } else {
+                    toInsert.add(entry.category)
+                    existingById[entry.category.id] = entry.category
+                    existingByKey[key] = entry.category
+                    entry.category.id
+                }
+                idMapping[entry.category.id] = targetCategoryId
                 if (entry.affectedItemIds.isNotEmpty()) {
-                    entry.affectedItemIds.chunked(500).forEach { chunk ->
-                        itemDao.reassignItemsToCategory(itemIds = chunk, toCategoryId = entry.category.id)
-                    }
+                    itemReassignments.add(entry.affectedItemIds to targetCategoryId)
                 }
             }
+
+            if (toInsert.isNotEmpty()) {
+                categoryDao.insertCategories(toInsert)
+            }
+            for ((itemIds, targetCategoryId) in itemReassignments) {
+                itemIds.chunked(500).forEach { chunk ->
+                    itemDao.reassignItemsToCategory(itemIds = chunk, toCategoryId = targetCategoryId)
+                }
+            }
+            idMapping
         }
     }
 }

@@ -66,6 +66,9 @@ class FakeCategoryDao(
     override suspend fun getCategoryById(id: String): Category? =
         categoriesFlow.value.find { it.id == id }
 
+    override suspend fun getAllCategoriesList(): List<Category> =
+        sorted(categoriesFlow.value)
+
     override suspend fun findByNameIgnoreCase(name: String): Category? =
         categoriesFlow.value.find { it.name.equals(name, ignoreCase = true) }
 

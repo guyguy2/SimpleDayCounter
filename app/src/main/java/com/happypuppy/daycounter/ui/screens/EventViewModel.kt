@@ -235,9 +235,7 @@ class EventViewModel(
         viewModelScope.launch {
             try {
                 categoryRepository.ensureInitialized()
-                val validCategoryId = categoryId.takeIf { id ->
-                    id.isNotBlank() && _categories.value.any { it.id == id }
-                } ?: DEFAULT_CATEGORY_ID
+                val validCategoryId = resolveValidCategoryId(categoryId)
                 repository.insertItem(
                     Item(
                         name = name,
@@ -259,9 +257,7 @@ class EventViewModel(
         viewModelScope.launch {
             try {
                 categoryRepository.ensureInitialized()
-                val validCategoryId = item.categoryId.takeIf { id ->
-                    id.isNotBlank() && _categories.value.any { it.id == id }
-                } ?: DEFAULT_CATEGORY_ID
+                val validCategoryId = resolveValidCategoryId(item.categoryId)
                 repository.insertItem(item.copy(categoryId = validCategoryId))
             } catch (e: CancellationException) {
                 throw e
@@ -269,6 +265,11 @@ class EventViewModel(
                 _uiState.update { it.copy(error = EventError.UpdateFailed) }
             }
         }
+    }
+
+    private suspend fun resolveValidCategoryId(categoryId: String): String {
+        if (categoryId.isBlank()) return DEFAULT_CATEGORY_ID
+        return categoryRepository.getCategoryById(categoryId)?.id ?: DEFAULT_CATEGORY_ID
     }
 
     fun deleteEvent(id: Int) {
@@ -279,7 +280,9 @@ class EventViewModel(
         if (item.id in _undoOverlay.value.pendingDeletedIds) return
         if (_rawItems.value?.none { it.id == item.id } == true) return
 
-        undoStack.addLast(item)
+        synchronized(undoStack) {
+            undoStack.addLast(item)
+        }
         _undoOverlay.update { overlay ->
             overlay.copy(
                 pendingDeletedIds = overlay.pendingDeletedIds + item.id,
@@ -296,11 +299,14 @@ class EventViewModel(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    undoStack.remove(item)
+                    val hasUndo = synchronized(undoStack) {
+                        undoStack.remove(item)
+                        undoStack.isNotEmpty()
+                    }
                     _undoOverlay.update { overlay ->
                         overlay.copy(
                             pendingDeletedIds = overlay.pendingDeletedIds - item.id,
-                            canUndo = undoStack.isNotEmpty()
+                            canUndo = hasUndo
                         )
                     }
                     _uiState.update { it.copy(error = EventError.DeleteFailed) }
@@ -310,25 +316,29 @@ class EventViewModel(
     }
 
     fun undoDelete() {
-        if (undoStack.isEmpty()) return
+        val hasPending = synchronized(undoStack) { undoStack.isNotEmpty() }
+        if (!hasPending) return
 
         viewModelScope.launch {
             dbMutex.withLock {
-                val item = undoStack.lastOrNull() ?: return@withLock
+                val item = synchronized(undoStack) { undoStack.lastOrNull() } ?: return@withLock
                 try {
                     repository.insertItem(item)
-                    undoStack.removeLast()
+                    val previous = synchronized(undoStack) {
+                        undoStack.remove(item)
+                        undoStack.lastOrNull()
+                    }
                     _undoOverlay.update { overlay ->
                         val nextVersion = (overlay.restoreVersions[item.id] ?: 0) + 1
                         overlay.copy(
                             pendingDeletedIds = overlay.pendingDeletedIds - item.id,
                             restoreVersions = overlay.restoreVersions + (item.id to nextVersion),
-                            canUndo = undoStack.isNotEmpty()
+                            canUndo = previous != null
                         )
                     }
                     _uiState.update { it.copy(error = null) }
-                    undoStack.lastOrNull()?.let { previous ->
-                        _events.trySend(MainUiEvent.ShowUndoSnackbar(previous.name))
+                    previous?.let {
+                        _events.trySend(MainUiEvent.ShowUndoSnackbar(it.name))
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -340,7 +350,9 @@ class EventViewModel(
     }
 
     fun dismissUndoSnackbar() {
-        undoStack.clear()
+        synchronized(undoStack) {
+            undoStack.clear()
+        }
         _undoOverlay.update { it.copy(canUndo = false) }
     }
 

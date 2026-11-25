@@ -1,14 +1,21 @@
 package com.happypuppy.daycounter.ui.screens
 
 import app.cash.turbine.test
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.CategoryDao
 import com.happypuppy.daycounter.data.database.CategoryRepository
+import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
 import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
+import com.happypuppy.daycounter.data.database.ItemDao
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -211,4 +218,73 @@ class EventViewModelEdgeCasesTest {
         assertEquals(2, ids.toSet().size)
         assertTrue(ids.none { it == 0 })
     }
+
+    @Test
+    fun `saveItem and updateItem preserve newly created category even before observeCategories flow emits`() =
+        runTest(dispatcher) {
+            val staleFlow = MutableStateFlow(DEFAULT_CATEGORIES)
+            val delayedFlowDao = object : CategoryDao by categoryDao {
+                override fun getAllCategories(): Flow<List<Category>> = staleFlow
+            }
+            var nextId = 1
+            val asyncCategoryRepo = CategoryRepository(
+                categoryDao = delayedFlowDao,
+                itemDao = dao,
+                idGenerator = { "custom-${nextId++}" }
+            )
+            val viewModel = EventViewModel(repository, asyncCategoryRepo)
+            advanceUntilIdle()
+
+            val created = viewModel.addCustomCategory("Travel")!!
+            // Intentionally do NOT emit `created` on `staleFlow` yet (simulating async Room Flow).
+            viewModel.saveItem("Trip", created.id, LocalDate.of(2026, 7, 1))
+            advanceUntilIdle()
+
+            val saved = dao.currentItems.single()
+            assertEquals(created.id, saved.categoryId)
+
+            val created2 = viewModel.addCustomCategory("Books")!!
+            viewModel.updateItem(saved.copy(categoryId = created2.id))
+            advanceUntilIdle()
+
+            assertEquals(created2.id, dao.currentItems.single().categoryId)
+        }
+
+    @Test
+    fun `dismissUndoSnackbar during suspended undoDelete does not throw or set RestoreFailed`() =
+        runTest(dispatcher) {
+            val target = item(7, "Race Event")
+            dao.insertItem(target)
+
+            val insertStarted = CompletableDeferred<Unit>()
+            val allowInsertFinish = CompletableDeferred<Unit>()
+            val suspendingItemDao = object : ItemDao by dao {
+                override suspend fun insertItem(item: Item) {
+                    if (item.id == target.id) {
+                        insertStarted.complete(Unit)
+                        allowInsertFinish.await()
+                    }
+                    dao.insertItem(item)
+                }
+            }
+            val raceRepo = ItemRepository(suspendingItemDao)
+            val viewModel = EventViewModel(raceRepo, categoryRepository)
+            advanceUntilIdle()
+
+            viewModel.deleteItem(target)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.canUndo)
+
+            viewModel.undoDelete()
+            insertStarted.await()
+
+            viewModel.dismissUndoSnackbar()
+            allowInsertFinish.complete(Unit)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.error)
+            assertFalse(viewModel.uiState.value.canUndo)
+            assertEquals(listOf(target), dao.currentItems)
+            assertEquals(listOf(target.id), viewModel.uiState.value.events.map { it.id })
+        }
 }

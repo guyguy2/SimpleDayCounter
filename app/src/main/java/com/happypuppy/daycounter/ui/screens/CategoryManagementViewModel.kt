@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
 sealed interface CategoryUiEvent {
     data class ShowUndoSnackbar(
@@ -82,6 +83,7 @@ class CategoryManagementViewModel(
 
     private val undoStack = ArrayDeque<DeletedCategorySnapshot>()
     private val dbMutex = Mutex()
+    private val undoDismissGeneration = AtomicLong(0L)
 
     init {
         viewModelScope.launch {
@@ -145,19 +147,26 @@ class CategoryManagementViewModel(
     }
 
     fun deleteCustomCategory(categoryId: String) {
+        val startGeneration = undoDismissGeneration.get()
         viewModelScope.launch {
             dbMutex.withLock {
                 try {
                     val snapshot = repository.deleteCustomCategory(categoryId) ?: return@withLock
                     val tracked = clearMatchingFilter(snapshot)
-                    undoStack.addLast(tracked)
-                    _uiState.update { it.copy(error = null, canUndo = true) }
-                    _events.trySend(
-                        CategoryUiEvent.ShowUndoSnackbar(
-                            label = tracked.entries.first().category.name,
-                            isAll = false
+                    if (undoDismissGeneration.get() == startGeneration) {
+                        synchronized(undoStack) {
+                            undoStack.addLast(tracked)
+                        }
+                        _uiState.update { it.copy(error = null, canUndo = true) }
+                        _events.trySend(
+                            CategoryUiEvent.ShowUndoSnackbar(
+                                label = tracked.entries.first().category.name,
+                                isAll = false
+                            )
                         )
-                    )
+                    } else {
+                        _uiState.update { it.copy(error = null) }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -168,19 +177,26 @@ class CategoryManagementViewModel(
     }
 
     fun deleteAllCustomCategories() {
+        val startGeneration = undoDismissGeneration.get()
         viewModelScope.launch {
             dbMutex.withLock {
                 try {
                     val snapshot = repository.deleteAllCustomCategories() ?: return@withLock
                     val tracked = clearMatchingFilter(snapshot)
-                    undoStack.addLast(tracked)
-                    _uiState.update { it.copy(error = null, canUndo = true) }
-                    _events.trySend(
-                        CategoryUiEvent.ShowUndoSnackbar(
-                            label = "",
-                            isAll = true
+                    if (undoDismissGeneration.get() == startGeneration) {
+                        synchronized(undoStack) {
+                            undoStack.addLast(tracked)
+                        }
+                        _uiState.update { it.copy(error = null, canUndo = true) }
+                        _events.trySend(
+                            CategoryUiEvent.ShowUndoSnackbar(
+                                label = "",
+                                isAll = true
+                            )
                         )
-                    )
+                    } else {
+                        _uiState.update { it.copy(error = null) }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -191,23 +207,28 @@ class CategoryManagementViewModel(
     }
 
     fun undoDelete() {
-        if (undoStack.isEmpty()) return
+        val hasPending = synchronized(undoStack) { undoStack.isNotEmpty() }
+        if (!hasPending) return
 
         viewModelScope.launch {
             dbMutex.withLock {
-                val snapshot = undoStack.lastOrNull() ?: return@withLock
+                val snapshot = synchronized(undoStack) { undoStack.lastOrNull() } ?: return@withLock
+                val startGeneration = undoDismissGeneration.get()
                 try {
-                    repository.restoreDeletedCategories(snapshot)
+                    val idMapping = repository.restoreDeletedCategories(snapshot)
                     snapshot.previousFilterState?.let { previousFilter ->
-                        listPreferences.setFilterState(previousFilter)
+                        listPreferences.setFilterState(mapRestoredFilter(previousFilter, snapshot, idMapping))
                     }
-                    undoStack.removeLast()
-                    _uiState.update { it.copy(error = null, canUndo = undoStack.isNotEmpty()) }
-                    undoStack.lastOrNull()?.let { previous ->
+                    val nextSnapshot = synchronized(undoStack) {
+                        undoStack.remove(snapshot)
+                        undoStack.lastOrNull()
+                    }
+                    _uiState.update { it.copy(error = null, canUndo = nextSnapshot != null) }
+                    if (nextSnapshot != null && undoDismissGeneration.get() == startGeneration) {
                         _events.trySend(
                             CategoryUiEvent.ShowUndoSnackbar(
-                                label = if (previous.isDeleteAll) "" else previous.entries.first().category.name,
-                                isAll = previous.isDeleteAll
+                                label = if (nextSnapshot.isDeleteAll) "" else nextSnapshot.entries.first().category.name,
+                                isAll = nextSnapshot.isDeleteAll
                             )
                         )
                     }
@@ -221,12 +242,38 @@ class CategoryManagementViewModel(
     }
 
     fun dismissUndoSnackbar() {
-        undoStack.clear()
+        undoDismissGeneration.incrementAndGet()
+        synchronized(undoStack) {
+            undoStack.clear()
+        }
         _uiState.update { it.copy(canUndo = false) }
     }
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    private fun mapRestoredFilter(
+        previousFilter: FilterState,
+        snapshot: DeletedCategorySnapshot,
+        idMapping: Map<String, String>
+    ): FilterState {
+        if (previousFilter.option != FilterOption.CATEGORY || previousFilter.category == null) {
+            return previousFilter
+        }
+        idMapping[previousFilter.category]?.let { mappedId ->
+            return previousFilter.copy(category = mappedId)
+        }
+        val previousLower = previousFilter.category.trim().lowercase(Locale.ROOT)
+        val matchedEntry = snapshot.entries.firstOrNull {
+            it.category.name.trim().lowercase(Locale.ROOT) == previousLower
+        }
+        val nameMappedId = matchedEntry?.let { idMapping[it.category.id] }
+        return if (nameMappedId != null) {
+            previousFilter.copy(category = nameMappedId)
+        } else {
+            previousFilter
+        }
     }
 
     private suspend fun clearMatchingFilter(snapshot: DeletedCategorySnapshot): DeletedCategorySnapshot {

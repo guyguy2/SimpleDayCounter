@@ -15,6 +15,7 @@ import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORIES
 import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
+import com.happypuppy.daycounter.data.database.InMemoryCategoryMigrationPreferences
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.ItemDao
 import com.happypuppy.daycounter.data.database.TransactionRunner
@@ -124,5 +125,27 @@ class CategoryDaoInstrumentedTest {
         assertEquals(travel.id, items.first { it.name == "Flight" }.categoryId)
         assertEquals(DEFAULT_CATEGORY_ID, items.first { it.name == "Dentist" }.categoryId)
         assertEquals(DEFAULT_CATEGORY_ID, items.first { it.name == "Groceries" }.categoryId)
+    }
+
+    @Test
+    fun unicodeCaseFoldingPreventsDuplicateCategoriesInRealSqlite() = runBlocking {
+        val prefs = InMemoryCategoryMigrationPreferences(
+            initialCustomCategories = setOf("CAFÉ"),
+            initialMigrated = false
+        )
+        val unicodeRepo = CategoryRepository(
+            categoryDao = categoryDao,
+            itemDao = itemDao,
+            migrationPreferences = prefs,
+            transactionRunner = object : TransactionRunner {
+                override suspend fun <T> run(block: suspend () -> T): T = db.withTransaction { block() }
+            }
+        )
+        unicodeRepo.ensureInitialized()
+
+        val duplicate = unicodeRepo.addCustomCategory("café")
+        assertTrue(duplicate is AddCategoryResult.Duplicate)
+        assertEquals(1, categoryDao.getCustomCategories().size)
+        assertEquals("CAFÉ", categoryDao.getCustomCategories().single().name)
     }
 }

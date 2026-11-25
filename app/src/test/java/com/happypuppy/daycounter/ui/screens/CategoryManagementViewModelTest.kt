@@ -1,10 +1,13 @@
 package com.happypuppy.daycounter.ui.screens
 
 import app.cash.turbine.test
+import com.happypuppy.daycounter.data.database.Category
+import com.happypuppy.daycounter.data.database.CategoryDao
 import com.happypuppy.daycounter.data.database.CategoryRepository
 import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.preferences.InMemoryEventListPreferences
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -172,4 +175,109 @@ class CategoryManagementViewModelTest {
         viewModel.clearError()
         assertNull(viewModel.uiState.value.error)
     }
+
+    @Test
+    fun `dismissUndoSnackbar during suspended undoDelete does not throw or set RestoreFailed`() =
+        runTest(dispatcher) {
+            val restoreStarted = CompletableDeferred<Unit>()
+            val allowRestoreFinish = CompletableDeferred<Unit>()
+            val suspendingDao = object : CategoryDao by categoryDao {
+                override suspend fun insertCategories(categories: List<Category>) {
+                    if (categories.any { !it.isDefault }) {
+                        restoreStarted.complete(Unit)
+                        allowRestoreFinish.await()
+                    }
+                    categoryDao.insertCategories(categories)
+                }
+            }
+            var nextId = 1
+            val repo = CategoryRepository(suspendingDao, itemDao, idGenerator = { "custom-${nextId++}" })
+            val viewModel = CategoryManagementViewModel(repo, listPreferences)
+            advanceUntilIdle()
+
+            val travel = viewModel.addCustomCategory("Travel")!!
+            itemDao.insertItem(Item(id = 1, name = "Trip", categoryId = travel.id, targetDate = LocalDate.of(2026, 7, 1)))
+            viewModel.deleteCustomCategory(travel.id)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.canUndo)
+
+            viewModel.undoDelete()
+            restoreStarted.await()
+
+            viewModel.dismissUndoSnackbar()
+            allowRestoreFinish.complete(Unit)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.error)
+            assertFalse(viewModel.uiState.value.canUndo)
+            assertNotNull(categoryDao.getCategoryById(travel.id))
+            assertEquals(travel.id, itemDao.currentItems.single().categoryId)
+        }
+
+    @Test
+    fun `dismissUndoSnackbar during suspended deleteCustomCategory prevents stale snackbar and canUndo`() =
+        runTest(dispatcher) {
+            val deleteStarted = CompletableDeferred<Unit>()
+            val allowDeleteFinish = CompletableDeferred<Unit>()
+            val suspendingDao = object : CategoryDao by categoryDao {
+                override suspend fun deleteCustomCategoryById(id: String): Int {
+                    deleteStarted.complete(Unit)
+                    allowDeleteFinish.await()
+                    return categoryDao.deleteCustomCategoryById(id)
+                }
+            }
+            var nextId = 1
+            val repo = CategoryRepository(suspendingDao, itemDao, idGenerator = { "custom-${nextId++}" })
+            val viewModel = CategoryManagementViewModel(repo, listPreferences)
+            advanceUntilIdle()
+
+            val travel = viewModel.addCustomCategory("Travel")!!
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                viewModel.deleteCustomCategory(travel.id)
+                deleteStarted.await()
+
+                viewModel.dismissUndoSnackbar()
+                allowDeleteFinish.complete(Unit)
+                advanceUntilIdle()
+
+                assertFalse(viewModel.uiState.value.canUndo)
+                assertNull(viewModel.uiState.value.error)
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `re-adding deleted category before Undo merges items into replacement and updates filter without duplicates`() =
+        runTest(dispatcher) {
+            val viewModel = CategoryManagementViewModel(repository, listPreferences)
+            advanceUntilIdle()
+
+            val oldTravel = viewModel.addCustomCategory("Travel")!!
+            itemDao.insertItem(Item(id = 1, name = "Old Trip", categoryId = oldTravel.id, targetDate = LocalDate.of(2026, 7, 1)))
+            listPreferences.setFilterState(FilterState(FilterOption.CATEGORY, oldTravel.id))
+            advanceUntilIdle()
+
+            viewModel.deleteCustomCategory(oldTravel.id)
+            advanceUntilIdle()
+            assertEquals(FilterState(FilterOption.ALL, null), listPreferences.filterStateFlow.first())
+
+            val newTravel = viewModel.addCustomCategory("Travel")!!
+            itemDao.insertItem(Item(id = 2, name = "New Trip", categoryId = newTravel.id, targetDate = LocalDate.of(2026, 7, 2)))
+            advanceUntilIdle()
+
+            viewModel.undoDelete()
+            advanceUntilIdle()
+
+            val customCategories = viewModel.uiState.value.customCategories
+            assertEquals(1, customCategories.size)
+            assertEquals(newTravel.id, customCategories.single().category.id)
+            assertEquals(2, customCategories.single().eventCount)
+            assertEquals(newTravel.id, itemDao.currentItems.first { it.id == 1 }.categoryId)
+            assertEquals(newTravel.id, itemDao.currentItems.first { it.id == 2 }.categoryId)
+            assertEquals(FilterState(FilterOption.CATEGORY, newTravel.id), listPreferences.filterStateFlow.first())
+            assertFalse(viewModel.uiState.value.canUndo)
+            assertNull(viewModel.uiState.value.error)
+        }
 }

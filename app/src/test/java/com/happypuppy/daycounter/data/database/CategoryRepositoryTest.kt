@@ -168,4 +168,53 @@ class CategoryRepositoryTest {
             assertEquals(books.id, itemDao.currentItems.first { it.id == 20 }.categoryId)
             assertEquals(WORK_CATEGORY_ID, itemDao.currentItems.first { it.id == 30 }.categoryId)
         }
+
+    @Test
+    fun `addCustomCategory and ensureInitialized reject non-ASCII Unicode duplicates case-insensitively`() =
+        runBlocking {
+            var nextId = 1
+            val prefs = InMemoryCategoryMigrationPreferences(
+                initialCustomCategories = setOf("CAFÉ", "café"),
+                initialMigrated = false
+            )
+            val repo = CategoryRepository(
+                categoryDao = categoryDao,
+                itemDao = itemDao,
+                migrationPreferences = prefs,
+                clock = fixedClock,
+                idGenerator = { "cat-${nextId++}" }
+            )
+
+            repo.ensureInitialized()
+            val customAfterInit = categoryDao.getCustomCategories()
+            assertEquals(1, customAfterInit.size)
+            assertEquals("CAFÉ", customAfterInit.single().name)
+
+            val duplicate = repo.addCustomCategory("café")
+            assertTrue(duplicate is AddCategoryResult.Duplicate)
+            assertEquals(customAfterInit.single().id, (duplicate as AddCategoryResult.Duplicate).existing.id)
+            assertEquals(1, categoryDao.getCustomCategories().size)
+        }
+
+    @Test
+    fun `restoreDeletedCategories merges into re-added same-name category without creating duplicates`() =
+        runBlocking {
+            var nextId = 1
+            val repo = CategoryRepository(categoryDao, itemDao, idGenerator = { "cat-${nextId++}" })
+            val oldTravel = (repo.addCustomCategory("Travel") as AddCategoryResult.Added).category
+            itemDao.insertItem(Item(id = 1, name = "Old Flight", categoryId = oldTravel.id, targetDate = LocalDate.of(2026, 7, 1)))
+
+            val snapshot = repo.deleteCustomCategory(oldTravel.id)!!
+            val newTravel = (repo.addCustomCategory("travel") as AddCategoryResult.Added).category
+            itemDao.insertItem(Item(id = 2, name = "New Flight", categoryId = newTravel.id, targetDate = LocalDate.of(2026, 7, 2)))
+
+            val mapping = repo.restoreDeletedCategories(snapshot)
+
+            val customCategories = categoryDao.getCustomCategories()
+            assertEquals(1, customCategories.size)
+            assertEquals(newTravel.id, customCategories.single().id)
+            assertEquals(newTravel.id, mapping[oldTravel.id])
+            assertEquals(newTravel.id, itemDao.currentItems.first { it.id == 1 }.categoryId)
+            assertEquals(newTravel.id, itemDao.currentItems.first { it.id == 2 }.categoryId)
+        }
 }

@@ -100,6 +100,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getCategoryById(id: String): Category?
 
+    @Query("SELECT * FROM categories")
+    suspend fun getAllCategoriesList(): List<Category>
+
     @Query("SELECT * FROM categories WHERE LOWER(name) = LOWER(:name) LIMIT 1")
     suspend fun findByNameIgnoreCase(name: String): Category?
 
