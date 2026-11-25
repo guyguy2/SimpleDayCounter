@@ -30,6 +30,7 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.MainActivity
@@ -100,12 +101,27 @@ class MainFlowInstrumentedTest {
         rule.onNode(hasText("Add event"), useUnmergedTree = true).performClick()
     }
 
+    private fun saveAddSheet(expectedCardText: String) {
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        rule.onNodeWithText("Save Event").performScrollTo().performClick()
+        rule.waitUntilDoesNotExist(hasText("Add New Event"), timeoutMillis = 5_000)
+        rule.waitUntilExactlyOneExists(hasText(expectedCardText), timeoutMillis = 5_000)
+    }
+
+    private fun saveEditSheet(expectedCardText: String) {
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        rule.onNodeWithText("Save").performScrollTo().performClick()
+        rule.waitUntilDoesNotExist(hasText("Edit Event"), timeoutMillis = 5_000)
+        rule.waitUntilExactlyOneExists(hasText(expectedCardText), timeoutMillis = 5_000)
+    }
+
     private fun addEvent(name: String) {
         clickAddEventFab()
         rule.waitUntilExactlyOneExists(hasText("Add New Event"), timeoutMillis = 5_000)
         rule.onNodeWithText("Event Name").performTextInput(name)
-        rule.onNodeWithText("Save Event").performClick()
-        rule.waitUntilExactlyOneExists(hasText(name), timeoutMillis = 5_000)
+        saveAddSheet(name)
     }
 
     @Test
@@ -279,9 +295,11 @@ class MainFlowInstrumentedTest {
         clickAddEventFab()
         rule.waitUntilExactlyOneExists(hasText("Add New Event"), timeoutMillis = 5_000)
 
-        rule.onNodeWithText("Save Event").assertIsNotEnabled()
+        rule.onNodeWithText("Save Event").performScrollTo().assertIsNotEnabled()
         rule.onNodeWithText("Event Name").performTextInput("Launch day")
-        rule.onNodeWithText("Save Event").assertIsEnabled()
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        rule.onNodeWithText("Save Event").performScrollTo().assertIsEnabled()
     }
 
     @Test
@@ -301,9 +319,8 @@ class MainFlowInstrumentedTest {
         rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
         rule.onNodeWithText("Event Name").performTextClearance()
         rule.onNodeWithText("Event Name").performTextInput("New name")
-        rule.onNodeWithText("Save").performClick()
+        saveEditSheet("New name")
 
-        rule.waitUntilExactlyOneExists(hasText("New name"), timeoutMillis = 5_000)
         rule.onNodeWithText("Old name").assertDoesNotExist()
     }
 
@@ -313,7 +330,7 @@ class MainFlowInstrumentedTest {
 
         rule.onNodeWithText("Doomed").performClick()
         rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
-        rule.onNodeWithText("Delete").performClick()
+        rule.onNodeWithText("Delete").performScrollTo().performClick()
 
         rule.waitUntilExactlyOneExists(hasText("Undo"), timeoutMillis = 5_000)
         rule.onNodeWithText("Undo").performClick()
@@ -437,6 +454,8 @@ class MainFlowInstrumentedTest {
 
         rule.onNodeWithContentDescription("Add Custom Category").performClick()
         rule.onNodeWithText("New Category").performTextInput("travel plans")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithContentDescription("Confirm").performClick()
 
         // Normalized to Title Case by normalizeCategoryName.
@@ -504,20 +523,23 @@ class MainFlowInstrumentedTest {
     fun addSheetInlineCustomCategoryPreservesFormAndAutoSelects() {
         openAddSheet()
         rule.onNodeWithText("Event Name").performTextInput("Marathon")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
 
-        fieldNode("Category").performClick()
+        fieldNode("Category").performScrollTo().performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
         rule.onNodeWithText("Add Custom\u2026").performClick()
 
         rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
         rule.onNodeWithText("New Category").performTextInput("fitness goals")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithText("Add").performClick()
 
         rule.waitUntilExactlyOneExists(hasText("Fitness Goals"), timeoutMillis = 5_000)
         rule.onNodeWithText("Marathon").assertExists()
 
-        rule.onNodeWithText("Save Event").performClick()
-        rule.waitUntilExactlyOneExists(hasText("Marathon"), timeoutMillis = 5_000)
+        saveAddSheet("Marathon")
 
         val categoryDao = koin.get<CategoryDao>()
         rule.waitUntil(timeoutMillis = 5_000) {
@@ -533,20 +555,23 @@ class MainFlowInstrumentedTest {
 
         rule.onNodeWithText("Event Name").performTextClearance()
         rule.onNodeWithText("Event Name").performTextInput("Annual checkup")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
 
-        fieldNode("Category").performClick()
+        fieldNode("Category").performScrollTo().performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
         rule.onNodeWithText("Add Custom\u2026").performClick()
 
         rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
         rule.onNodeWithText("New Category").performTextInput("medical")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithText("Add").performClick()
 
         rule.waitUntilExactlyOneExists(hasText("Medical"), timeoutMillis = 5_000)
         rule.onNodeWithText("Annual checkup").assertExists()
 
-        rule.onNodeWithText("Save").performClick()
-        rule.waitUntilExactlyOneExists(hasText("Annual checkup"), timeoutMillis = 5_000)
+        saveEditSheet("Annual checkup")
         rule.onNodeWithText("Checkup").assertDoesNotExist()
     }
 
@@ -554,11 +579,12 @@ class MainFlowInstrumentedTest {
     fun addSheetEmojiSuggestionPopulatesFieldAndSaves() {
         openAddSheet()
         rule.onNodeWithText("Event Name").performTextInput("Birthday")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
 
         rule.onNodeWithContentDescription("Birthday emoji").performClick()
-        rule.onNodeWithText("Save Event").performClick()
+        saveAddSheet("Birthday")
 
-        rule.waitUntilExactlyOneExists(hasText("Birthday"), timeoutMillis = 5_000)
         rule.onNodeWithText("\uD83C\uDF82").assertExists()
     }
 
@@ -566,15 +592,18 @@ class MainFlowInstrumentedTest {
     fun deletingInUseCustomCategoryShowsUsageCountReassignsToPersonalAndUndoRestores() {
         openAddSheet()
         rule.onNodeWithText("Event Name").performTextInput("Tokyo Flight")
-        fieldNode("Category").performClick()
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        fieldNode("Category").performScrollTo().performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
         rule.onNodeWithText("Add Custom\u2026").performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
         rule.onNodeWithText("New Category").performTextInput("travel")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithText("Add").performClick()
         rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
-        rule.onNodeWithText("Save Event").performClick()
-        rule.waitUntilExactlyOneExists(hasText("Tokyo Flight"), timeoutMillis = 5_000)
+        saveAddSheet("Tokyo Flight")
 
         rule.onNodeWithContentDescription("Settings").performClick()
         rule.waitUntilExactlyOneExists(hasText("Manage Categories"), timeoutMillis = 5_000)
@@ -613,27 +642,33 @@ class MainFlowInstrumentedTest {
     fun deleteAllCustomCategoriesShowsTotalUsageCountReassignsAndUndoRestores() {
         openAddSheet()
         rule.onNodeWithText("Event Name").performTextInput("Flight")
-        fieldNode("Category").performClick()
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        fieldNode("Category").performScrollTo().performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
         rule.onNodeWithText("Add Custom\u2026").performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
         rule.onNodeWithText("New Category").performTextInput("travel")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithText("Add").performClick()
         rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
-        rule.onNodeWithText("Save Event").performClick()
-        rule.waitUntilExactlyOneExists(hasText("Flight"), timeoutMillis = 5_000)
+        saveAddSheet("Flight")
 
         openAddSheet()
         rule.onNodeWithText("Event Name").performTextInput("Novel")
-        fieldNode("Category").performClick()
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+        fieldNode("Category").performScrollTo().performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom\u2026"), timeoutMillis = 5_000)
         rule.onNodeWithText("Add Custom\u2026").performClick()
         rule.waitUntilExactlyOneExists(hasText("Add Custom Category"), timeoutMillis = 5_000)
         rule.onNodeWithText("New Category").performTextInput("books")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithText("Add").performClick()
         rule.waitUntilExactlyOneExists(hasText("Books"), timeoutMillis = 5_000)
-        rule.onNodeWithText("Save Event").performClick()
-        rule.waitUntilExactlyOneExists(hasText("Novel"), timeoutMillis = 5_000)
+        saveAddSheet("Novel")
 
         rule.onNodeWithContentDescription("Settings").performClick()
         rule.waitUntilExactlyOneExists(hasText("Manage Categories"), timeoutMillis = 5_000)
