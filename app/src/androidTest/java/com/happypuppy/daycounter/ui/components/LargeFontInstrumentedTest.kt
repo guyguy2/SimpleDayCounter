@@ -47,7 +47,12 @@ class LargeFontInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun eventUi(name: String, daysFromToday: Int): EventUi = EventUi(
+    private fun eventUi(
+        name: String,
+        daysFromToday: Int,
+        repeatsYearly: Boolean = false,
+        years: Int = 0
+    ): EventUi = EventUi(
         id = 1,
         name = name,
         categoryId = DEFAULT_CATEGORY_ID,
@@ -56,7 +61,9 @@ class LargeFontInstrumentedTest {
         daysLeft = daysFromToday,
         dayLabel = dayLabelFor(daysFromToday),
         emoji = "",
-        createdAtMillis = 0L
+        createdAtMillis = 0L,
+        repeatsYearly = repeatsYearly,
+        years = years
     )
 
     private fun layoutOf(text: String): TextLayoutResult {
@@ -108,5 +115,23 @@ class LargeFontInstrumentedTest {
         }
 
         assertEquals("app bar title must render on a single line", 1, layoutOf("Simple Day Counter").lineCount)
+    }
+
+    @Test
+    fun repeatingEventYearsLineRendersWithoutOverflowAtMaxFontScale() {
+        val event = eventUi(
+            name = "Anniversary",
+            daysFromToday = 365,
+            repeatsYearly = true,
+            years = 25
+        )
+        setLargeFontContent { EventCard(event = event, onClick = {}) }
+
+        val yearsLayout = layoutOf("25 years")
+        assertTrue("years line must not overflow height", !yearsLayout.didOverflowHeight)
+        assertTrue(
+            "years line must not be ellipsized",
+            (0 until yearsLayout.lineCount).none { yearsLayout.isLineEllipsized(it) }
+        )
     }
 }
