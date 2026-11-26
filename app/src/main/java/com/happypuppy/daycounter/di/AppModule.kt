@@ -6,6 +6,7 @@ import com.happypuppy.daycounter.data.database.AppDatabase
 import com.happypuppy.daycounter.data.database.CategoryRepository
 import com.happypuppy.daycounter.data.database.ItemRepository
 import com.happypuppy.daycounter.data.database.MIGRATION_4_5
+import com.happypuppy.daycounter.data.database.MIGRATION_5_6
 import com.happypuppy.daycounter.data.database.TransactionRunner
 import com.happypuppy.daycounter.data.preferences.CategoryMigrationPreferences
 import com.happypuppy.daycounter.data.preferences.DataStoreManager
@@ -28,7 +29,7 @@ val appModule = module {
             AppDatabase::class.java,
             "app_database"
         )
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             // Allow destructive upgrade only from legacy pre-v4 dev schemas;
             // v4 -> v5+ uses explicit Room Migrations.
             .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3)

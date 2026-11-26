@@ -15,7 +15,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
@@ -23,6 +25,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.happypuppy.daycounter.data.database.DEFAULT_CATEGORY_ID
+import com.happypuppy.daycounter.data.preferences.DateFormat
+import com.happypuppy.daycounter.data.preferences.formatDate
 import com.happypuppy.daycounter.ui.screens.EventUi
 import com.happypuppy.daycounter.ui.screens.MainTopBarTitle
 import com.happypuppy.daycounter.ui.theme.SimpleDayCounterTheme
@@ -47,16 +51,24 @@ class LargeFontInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun eventUi(name: String, daysFromToday: Int): EventUi = EventUi(
+    private fun eventUi(
+        name: String,
+        daysFromToday: Int,
+        repeatsYearly: Boolean = false,
+        years: Int = 0,
+        targetDate: LocalDate = LocalDate.of(2026, 6, 15).plusDays(daysFromToday.toLong())
+    ): EventUi = EventUi(
         id = 1,
         name = name,
         categoryId = DEFAULT_CATEGORY_ID,
         categoryName = "Personal",
-        targetDate = LocalDate.of(2026, 6, 15).plusDays(daysFromToday.toLong()),
+        targetDate = targetDate,
         daysLeft = daysFromToday,
         dayLabel = dayLabelFor(daysFromToday),
         emoji = "",
-        createdAtMillis = 0L
+        createdAtMillis = 0L,
+        repeatsYearly = repeatsYearly,
+        years = years
     )
 
     private fun layoutOf(text: String): TextLayoutResult {
@@ -108,5 +120,59 @@ class LargeFontInstrumentedTest {
         }
 
         assertEquals("app bar title must render on a single line", 1, layoutOf("Simple Day Counter").lineCount)
+    }
+
+    @Test
+    fun repeatingEventYearsLineRendersWithoutOverflowAtMaxFontScale() {
+        val event = eventUi(
+            name = "Anniversary",
+            daysFromToday = 365,
+            repeatsYearly = true,
+            years = 25
+        )
+        setLargeFontContent { EventCard(event = event, onClick = {}) }
+
+        val yearsLayout = layoutOf("25 years")
+        assertTrue("years line must not overflow height", !yearsLayout.didOverflowHeight)
+        assertTrue(
+            "years line must not be ellipsized",
+            (0 until yearsLayout.lineCount).none { yearsLayout.isLineEllipsized(it) }
+        )
+    }
+
+    @Test
+    fun repeatingEventDateAndRepeatIconRenderWithoutClippingAtMaxFontScale() {
+        val event = eventUi(
+            name = "Anniversary",
+            daysFromToday = 365,
+            repeatsYearly = true,
+            years = 0,
+            targetDate = LocalDate.of(2027, 9, 28)
+        )
+        rule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                SimpleDayCounterTheme(darkTheme = false, dateFormat = DateFormat.FULL) {
+                    Box(modifier = Modifier.width(360.dp)) {
+                        EventCard(event = event, onClick = {})
+                    }
+                }
+            }
+        }
+
+        val formattedDate = formatDate(event.targetDate, DateFormat.FULL)
+        val dateLayout = layoutOf(formattedDate)
+        assertTrue("date text must not overflow height", !dateLayout.didOverflowHeight)
+        assertTrue(
+            "date text must not be ellipsized",
+            (0 until dateLayout.lineCount).none { dateLayout.isLineEllipsized(it) }
+        )
+
+        val iconNode = rule.onNodeWithTag(EVENT_CARD_REPEAT_ICON_TAG, useUnmergedTree = true)
+        iconNode.assertIsDisplayed()
+        assertTrue(
+            "repeat icon must retain positive rendered width",
+            iconNode.fetchSemanticsNode().size.width > 0
+        )
     }
 }

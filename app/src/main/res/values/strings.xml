@@ -10,6 +10,11 @@
         <item quantity="one">day past</item>
         <item quantity="other">days past</item>
     </plurals>
+    <plurals name="event_card_years">
+        <item quantity="one">%1$d year</item>
+        <item quantity="other">%1$d years</item>
+    </plurals>
+    <string name="event_card_repeats_yearly">repeats every year</string>
     <string name="main_error_load_failed">Failed to load events</string>
     <string name="main_error_save_failed">Failed to save event</string>
     <string name="main_error_update_failed">Failed to update event</string>
@@ -68,6 +73,8 @@
     <string name="form_preset_tomorrow">Tomorrow</string>
     <string name="form_preset_one_week">+1 week</string>
     <string name="form_preset_one_month">+1 month</string>
+    <string name="form_repeat_yearly">Repeats every year</string>
+    <string name="form_repeat_yearly_supporting">Great for birthdays and anniversaries</string>
     <string name="add_event_title">Add New Event</string>
     <string name="add_event_save">Save Event</string>
     <string name="edit_event_title">Edit Event</string>

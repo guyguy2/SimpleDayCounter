@@ -1,6 +1,7 @@
 package com.happypuppy.daycounter.ui.components
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,7 +25,11 @@ class EventCardDayLabelInstrumentedTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun eventUi(daysFromToday: Int): EventUi {
+    private fun eventUi(
+        daysFromToday: Int,
+        repeatsYearly: Boolean = false,
+        years: Int = 0
+    ): EventUi {
         val today = LocalDate.of(2026, 6, 15)
         return EventUi(
             id = 1,
@@ -35,12 +40,18 @@ class EventCardDayLabelInstrumentedTest {
             daysLeft = daysFromToday,
             dayLabel = dayLabelFor(daysFromToday),
             emoji = "",
-            createdAtMillis = 0L
+            createdAtMillis = 0L,
+            repeatsYearly = repeatsYearly,
+            years = years
         )
     }
 
-    private fun renderCard(daysFromToday: Int) {
-        val event = eventUi(daysFromToday)
+    private fun renderCard(
+        daysFromToday: Int,
+        repeatsYearly: Boolean = false,
+        years: Int = 0
+    ) {
+        val event = eventUi(daysFromToday, repeatsYearly = repeatsYearly, years = years)
         rule.setContent {
             SimpleDayCounterTheme(darkTheme = false) { EventCard(event = event, onClick = {}) }
         }
@@ -73,4 +84,35 @@ class EventCardDayLabelInstrumentedTest {
     @Test
     fun largePastCountShowsAbsoluteValueWithoutMinusAndPluralDaysPast() =
         assertBadgeAndLabel(-1135, "1135", "days past")
+
+    @Test
+    fun repeatingEventWithOneYearShowsSingularYearAndRepeatsYearlyAccessibility() {
+        renderCard(daysFromToday = 0, repeatsYearly = true, years = 1)
+        rule.onNodeWithText("Sample event").assertIsDisplayed()
+        rule.onNodeWithText("1 year", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText("Today!", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(
+            hasContentDescription("1 year", substring = true) and
+                hasContentDescription("repeats every year", substring = true) and
+                hasContentDescription("Sample event", substring = true)
+        ).assertExists()
+    }
+
+    @Test
+    fun repeatingEventWithMultipleYearsShowsPluralYearsAndRepeatsYearlyAccessibility() {
+        renderCard(daysFromToday = 364, repeatsYearly = true, years = 5)
+        rule.onNodeWithText("5 years", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText("364", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(
+            hasContentDescription("5 years", substring = true) and
+                hasContentDescription("repeats every year", substring = true)
+        ).assertExists()
+    }
+
+    @Test
+    fun repeatingEventWithZeroYearsHidesYearsLine() {
+        renderCard(daysFromToday = 10, repeatsYearly = true, years = 0)
+        rule.onNodeWithText("year", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        rule.onNode(hasContentDescription("repeats every year", substring = true)).assertExists()
+    }
 }

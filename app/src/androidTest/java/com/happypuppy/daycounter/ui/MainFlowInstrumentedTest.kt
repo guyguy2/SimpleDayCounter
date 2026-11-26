@@ -690,4 +690,51 @@ class MainFlowInstrumentedTest {
         rule.waitUntilExactlyOneExists(hasText("Travel"), timeoutMillis = 5_000)
         rule.onNodeWithText("Books").assertExists()
     }
+
+    @Test
+    fun createAndEditYearlyRepeatingEventPersistsToggleAndShowsCardIndicators() {
+        openAddSheet()
+        assertNoUnlabelledClickTargets()
+
+        val repeatToggle = hasText("Repeats every year") and isToggleable()
+        rule.onNode(repeatToggle).performScrollTo().assertIsOff()
+
+        rule.onNodeWithText("Event Name").performScrollTo().performTextInput("Mom Birthday")
+        Espresso.closeSoftKeyboard()
+        rule.waitForIdle()
+
+        rule.onNode(repeatToggle).performScrollTo().performClick()
+        rule.onNode(repeatToggle).assertIsOn()
+
+        saveAddSheet("Mom Birthday")
+
+        rule.onNodeWithText("Today!").assertExists()
+        rule.onNodeWithContentDescription("repeats every year", substring = true).assertExists()
+
+        val itemDao = koin.get<AppDatabase>().itemDao()
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) {
+                itemDao.getAllItems().first().any { it.name == "Mom Birthday" && it.repeatsYearly }
+            }
+        }
+
+        rule.onNodeWithText("Mom Birthday").performClick()
+        rule.waitUntilExactlyOneExists(hasText("Edit Event"), timeoutMillis = 5_000)
+        assertNoUnlabelledClickTargets()
+        rule.onNode(repeatToggle).performScrollTo().assertIsOn()
+
+        rule.onNode(repeatToggle).performScrollTo().performClick()
+        rule.onNode(repeatToggle).assertIsOff()
+
+        saveEditSheet("Mom Birthday")
+        rule.waitUntilDoesNotExist(
+            hasContentDescription("repeats every year", substring = true),
+            timeoutMillis = 5_000
+        )
+        rule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking(Dispatchers.IO) {
+                itemDao.getAllItems().first().any { it.name == "Mom Birthday" && !it.repeatsYearly }
+            }
+        }
+    }
 }

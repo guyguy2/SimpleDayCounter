@@ -330,4 +330,158 @@ class EventViewModelTest {
         assertEquals(-1, pastEvent.daysLeft)
         assertEquals(DayLabel.Past(1), pastEvent.dayLabel)
     }
+
+    @Test
+    fun `yearly repeating event computes next occurrence, years, and rolls at midnight`() = runTest(dispatcher) {
+        val zone = ZoneId.of("UTC")
+        var currentInstant = ZonedDateTime.of(2026, 6, 15, 23, 55, 0, 0, zone).toInstant()
+        val fakeClock = object : Clock() {
+            override fun getZone(): ZoneId = zone
+            override fun withZone(zone: ZoneId): Clock = this
+            override fun instant(): Instant = currentInstant
+        }
+        val midnightTicks = MutableSharedFlow<LocalDate>()
+
+        // Original date was 2021-06-15 -> 5th anniversary is today (2026-06-15).
+        dao.insertItem(
+            Item(
+                id = 1,
+                name = "Birthday",
+                categoryId = DEFAULT_CATEGORY_ID,
+                targetDate = LocalDate.of(2021, 6, 15),
+                repeatsYearly = true
+            )
+        )
+        // Future original date -> years is 0.
+        dao.insertItem(
+            Item(
+                id = 2,
+                name = "Future Launch",
+                categoryId = WORK_CATEGORY_ID,
+                targetDate = LocalDate.of(2027, 1, 10),
+                repeatsYearly = true
+            )
+        )
+
+        val viewModel = EventViewModel(repository, categoryRepository, clock = fakeClock, midnightTicks = midnightTicks)
+        advanceUntilIdle()
+
+        val birthdayToday = viewModel.uiState.value.events.first { it.id == 1 }
+        assertEquals(LocalDate.of(2026, 6, 15), birthdayToday.targetDate)
+        assertEquals(0, birthdayToday.daysLeft)
+        assertEquals(DayLabel.Today, birthdayToday.dayLabel)
+        assertTrue(birthdayToday.repeatsYearly)
+        assertEquals(5, birthdayToday.years)
+
+        val futureEvent = viewModel.uiState.value.events.first { it.id == 2 }
+        assertEquals(LocalDate.of(2027, 1, 10), futureEvent.targetDate)
+        assertEquals(0, futureEvent.years)
+
+        // Cross midnight into 2026-06-16 -> rolls to 2027-06-15 (364 days left, 6 years).
+        currentInstant = ZonedDateTime.of(2026, 6, 16, 0, 0, 1, 0, zone).toInstant()
+        midnightTicks.emit(LocalDate.of(2026, 6, 16))
+        runCurrent()
+
+        val rolled = viewModel.uiState.value.events.first { it.id == 1 }
+        assertEquals(LocalDate.of(2027, 6, 15), rolled.targetDate)
+        assertEquals(364, rolled.daysLeft)
+        assertEquals(DayLabel.Left(364), rolled.dayLabel)
+        assertEquals(6, rolled.years)
+    }
+
+    @Test
+    fun `yearly repeating events never match PAST filter and sort by next occurrence`() = runTest(dispatcher) {
+        val zone = ZoneId.of("UTC")
+        val fakeClock = Clock.fixed(ZonedDateTime.of(2026, 6, 15, 12, 0, 0, 0, zone).toInstant(), zone)
+
+        // Original 2020-06-10 -> next occurrence 2027-06-10 (360 days left).
+        dao.insertItem(
+            Item(
+                id = 1,
+                name = "Anniversary",
+                categoryId = DEFAULT_CATEGORY_ID,
+                targetDate = LocalDate.of(2020, 6, 10),
+                repeatsYearly = true
+            )
+        )
+        // Original 2020-07-01 -> next occurrence 2026-07-01 (16 days left).
+        dao.insertItem(
+            Item(
+                id = 2,
+                name = "Summer Party",
+                categoryId = DEFAULT_CATEGORY_ID,
+                targetDate = LocalDate.of(2020, 7, 1),
+                repeatsYearly = true
+            )
+        )
+        // Non-repeating past event.
+        dao.insertItem(
+            Item(
+                id = 3,
+                name = "Past One-off",
+                categoryId = WORK_CATEGORY_ID,
+                targetDate = LocalDate.of(2026, 6, 1),
+                repeatsYearly = false
+            )
+        )
+
+        val viewModel = EventViewModel(repository, categoryRepository, clock = fakeClock)
+        advanceUntilIdle()
+
+        viewModel.setFilterState(FilterState(FilterOption.PAST))
+        assertEquals(listOf("Past One-off"), viewModel.uiState.value.events.map { it.name })
+
+        viewModel.setFilterState(FilterState(FilterOption.FUTURE))
+        assertEquals(setOf("Anniversary", "Summer Party"), viewModel.uiState.value.events.map { it.name }.toSet())
+
+        viewModel.setFilterState(FilterState(FilterOption.ALL))
+        viewModel.setSortOption(SortOption.TARGET_DATE_ASC)
+        assertEquals(
+            listOf("Past One-off", "Summer Party", "Anniversary"),
+            viewModel.uiState.value.events.map { it.name }
+        )
+
+        viewModel.setSortOption(SortOption.TARGET_DATE_DESC)
+        assertEquals(
+            listOf("Anniversary", "Summer Party", "Past One-off"),
+            viewModel.uiState.value.events.map { it.name }
+        )
+    }
+
+    @Test
+    fun `saveItem, updateItem, and undoDelete preserve repeatsYearly flag`() = runTest(dispatcher) {
+        val zone = ZoneId.of("UTC")
+        val fakeClock = Clock.fixed(ZonedDateTime.of(2026, 6, 15, 12, 0, 0, 0, zone).toInstant(), zone)
+        val viewModel = EventViewModel(repository, categoryRepository, clock = fakeClock)
+        advanceUntilIdle()
+
+        viewModel.saveItem(
+            name = "Birthday",
+            categoryId = DEFAULT_CATEGORY_ID,
+            targetDate = LocalDate.of(2000, 12, 1),
+            emoji = "\uD83C\uDF82",
+            repeatsYearly = true
+        )
+        advanceUntilIdle()
+
+        val saved = dao.currentItems.single()
+        assertTrue(saved.repeatsYearly)
+        assertTrue(viewModel.uiState.value.events.single().repeatsYearly)
+
+        viewModel.updateItem(saved.copy(name = "Mom Birthday"))
+        advanceUntilIdle()
+        val updated = dao.currentItems.single()
+        assertEquals("Mom Birthday", updated.name)
+        assertTrue(updated.repeatsYearly)
+
+        viewModel.deleteItem(updated)
+        advanceUntilIdle()
+        assertTrue(dao.currentItems.isEmpty())
+
+        viewModel.undoDelete()
+        advanceUntilIdle()
+        val restored = dao.currentItems.single()
+        assertTrue(restored.repeatsYearly)
+        assertTrue(viewModel.uiState.value.events.single().repeatsYearly)
+    }
 }

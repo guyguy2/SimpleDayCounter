@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,10 +42,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +67,8 @@ import com.happypuppy.daycounter.ui.theme.LocalEventCardColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.isColorBright
+
+internal const val EVENT_CARD_REPEAT_ICON_TAG = "event_card_repeat_icon"
 
 @Composable
 fun EventCard(
@@ -113,6 +118,38 @@ fun EventCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
+    val formattedDate = formatDate(event.targetDate, dateFormat)
+    val yearsText = if (event.years > 0) {
+        pluralStringResource(R.plurals.event_card_years, event.years, event.years)
+    } else {
+        null
+    }
+    val categoryDisplay = if (event.categoryName.isNotBlank()) {
+        categoryDisplayName(event.categoryId, event.categoryName)
+    } else {
+        ""
+    }
+    val dayCountText = kotlin.math.abs(daysLeft).toString()
+    val dayLabelText = when (val label = event.dayLabel) {
+        DayLabel.Today -> stringResource(R.string.event_card_today)
+        is DayLabel.Left -> pluralStringResource(R.plurals.event_card_days_left, label.days)
+        is DayLabel.Past -> pluralStringResource(R.plurals.event_card_days_past, label.days)
+    }
+    val repeatsYearlyLabel = stringResource(R.string.event_card_repeats_yearly)
+    val cardContentDescription = if (event.repeatsYearly) {
+        listOfNotNull(
+            event.name,
+            formattedDate,
+            yearsText,
+            repeatsYearlyLabel,
+            categoryDisplay.takeIf { it.isNotBlank() },
+            dayCountText,
+            dayLabelText
+        ).joinToString(", ")
+    } else {
+        null
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -137,7 +174,12 @@ fun EventCard(
                 onClickLabel = editLabel,
                 onClick = onClick
             )
-            .semantics { customActions = accessibilityActions },
+            .semantics {
+                customActions = accessibilityActions
+                if (cardContentDescription != null) {
+                    contentDescription = cardContentDescription
+                }
+            },
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor,
             contentColor = primaryTextColor
@@ -194,18 +236,41 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(8.dp)) // Additional spacing
 
                 // Date with the selected format
-                val formattedDate = formatDate(event.targetDate, dateFormat)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = formattedDate,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = secondaryTextColor
+                    )
+                    if (event.repeatsYearly) {
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = null,
+                            tint = secondaryTextColor,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .testTag(EVENT_CARD_REPEAT_ICON_TAG)
+                        )
+                    }
+                }
 
-                Text(
-                    text = formattedDate,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = secondaryTextColor
-                )
+                // Years line when repeating from a past date
+                if (yearsText != null) {
+                    Text(
+                        text = yearsText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryTextColor
+                    )
+                }
 
                 // Category
-                if (event.categoryName.isNotBlank()) {
+                if (categoryDisplay.isNotBlank()) {
                     Text(
-                        text = categoryDisplayName(event.categoryId, event.categoryName),
+                        text = categoryDisplay,
                         style = MaterialTheme.typography.bodySmall,
                         color = secondaryTextColor
                     )
@@ -228,7 +293,7 @@ fun EventCard(
                     val textColor = if (isColorBright(categoryColor)) Color.Black else Color.White
 
                     Text(
-                        text = kotlin.math.abs(daysLeft).toString(),
+                        text = dayCountText,
                         color = textColor,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
@@ -240,11 +305,7 @@ fun EventCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = when (val label = event.dayLabel) {
-                        DayLabel.Today -> stringResource(R.string.event_card_today)
-                        is DayLabel.Left -> pluralStringResource(R.plurals.event_card_days_left, label.days)
-                        is DayLabel.Past -> pluralStringResource(R.plurals.event_card_days_past, label.days)
-                    },
+                    text = dayLabelText,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center
                 )

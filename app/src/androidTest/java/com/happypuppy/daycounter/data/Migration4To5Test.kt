@@ -11,6 +11,7 @@ import com.happypuppy.daycounter.data.database.FINANCE_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.HEALTH_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.data.database.MIGRATION_4_5
+import com.happypuppy.daycounter.data.database.MIGRATION_5_6
 import com.happypuppy.daycounter.data.database.WORK_CATEGORY_ID
 import com.happypuppy.daycounter.data.database.migration4To5
 import kotlinx.coroutines.flow.first
@@ -176,7 +177,7 @@ class Migration4To5Test {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val roomDb = Room.databaseBuilder(context, AppDatabase::class.java, testDbName)
-            .addMigrations(migration4To5(utc))
+            .addMigrations(migration4To5(utc), MIGRATION_5_6)
             .build()
         try {
             val categories = roomDb.categoryDao().getAllCategories().first()
@@ -188,6 +189,7 @@ class Migration4To5Test {
             assertEquals(1, items.size)
             assertEquals(LocalDate.of(2026, 12, 25), items.single().targetDate)
             assertEquals(travel.id, items.single().categoryId)
+            assertFalse(items.single().repeatsYearly)
 
             val music = Category(id = "music-id", name = "Music", isDefault = false, createdAt = 999L)
             roomDb.categoryDao().insertCategory(music)

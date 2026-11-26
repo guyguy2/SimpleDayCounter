@@ -231,7 +231,13 @@ class EventViewModel(
         }
     }
 
-    fun saveItem(name: String, categoryId: String, targetDate: LocalDate, emoji: String = "") {
+    fun saveItem(
+        name: String,
+        categoryId: String,
+        targetDate: LocalDate,
+        emoji: String = "",
+        repeatsYearly: Boolean = false
+    ) {
         viewModelScope.launch {
             try {
                 categoryRepository.ensureInitialized()
@@ -242,7 +248,8 @@ class EventViewModel(
                         categoryId = validCategoryId,
                         targetDate = targetDate,
                         createdAt = Date.from(clock.instant()),
-                        emoji = emoji
+                        emoji = emoji,
+                        repeatsYearly = repeatsYearly
                     )
                 )
             } catch (e: CancellationException) {

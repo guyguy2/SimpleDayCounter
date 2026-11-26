@@ -36,7 +36,8 @@ data class Item(
     @ColumnInfo(name = "category_id") val categoryId: String = DEFAULT_CATEGORY_ID,
     @ColumnInfo(name = "created_at") val createdAt: Date = Date(),
     @ColumnInfo(name = "target_date") val targetDate: LocalDate,
-    @ColumnInfo(name = "emoji") val emoji: String = ""
+    @ColumnInfo(name = "emoji") val emoji: String = "",
+    @ColumnInfo(name = "repeats_yearly", defaultValue = "0") val repeatsYearly: Boolean = false
 )
 
 @Dao
@@ -128,7 +129,7 @@ interface CategoryDao {
     suspend fun getItemIdsForCustomCategories(): List<ItemCategoryRef>
 }
 
-@Database(entities = [Item::class, Category::class], version = 5, exportSchema = true)
+@Database(entities = [Item::class, Category::class], version = 6, exportSchema = true)
 @TypeConverters(DateConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao

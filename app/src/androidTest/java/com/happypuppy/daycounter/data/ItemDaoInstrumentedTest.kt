@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import java.time.LocalDate
 import java.util.Date
 
-/** Real Room (in-memory) coverage for the v5 ItemDao & foreign-key contract. */
+/** Real Room (in-memory) coverage for the v6 ItemDao & foreign-key contract. */
 @RunWith(AndroidJUnit4::class)
 class ItemDaoInstrumentedTest {
 
@@ -90,12 +90,25 @@ class ItemDaoInstrumentedTest {
     }
 
     @Test
-    fun fieldsRoundTripIncludingEmojiAndLocalDate() = runBlocking {
-        val original = item("trip", createdAt = 42, targetDate = LocalDate.of(2028, 2, 29))
-        dao.insertItem(original)
+    fun fieldsRoundTripIncludingEmojiLocalDateAndRepeatsYearly() = runBlocking {
+        val oneOff = item("trip", createdAt = 42, targetDate = LocalDate.of(2028, 2, 29))
+        val repeating = Item(
+            name = "birthday",
+            categoryId = DEFAULT_CATEGORY_ID,
+            createdAt = Date(84),
+            targetDate = LocalDate.of(1995, 5, 10),
+            emoji = "\uD83C\uDF82",
+            repeatsYearly = true
+        )
+        dao.insertItem(oneOff)
+        dao.insertItem(repeating)
 
-        val loaded = dao.getAllItems().first().single()
-        assertEquals(original.copy(id = loaded.id), loaded)
+        val loaded = dao.getAllItems().first()
+        val loadedOneOff = loaded.first { it.name == "trip" }
+        val loadedRepeating = loaded.first { it.name == "birthday" }
+        assertEquals(oneOff.copy(id = loadedOneOff.id), loadedOneOff)
+        assertEquals(repeating.copy(id = loadedRepeating.id), loadedRepeating)
+        assertTrue(loadedRepeating.repeatsYearly)
     }
 
     @Test
