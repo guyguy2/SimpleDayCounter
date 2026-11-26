@@ -727,7 +727,10 @@ class MainFlowInstrumentedTest {
         rule.onNode(repeatToggle).assertIsOff()
 
         saveEditSheet("Mom Birthday")
-        rule.onNodeWithContentDescription("repeats every year", substring = true).assertDoesNotExist()
+        rule.waitUntilDoesNotExist(
+            hasContentDescription("repeats every year", substring = true),
+            timeoutMillis = 5_000
+        )
         rule.waitUntil(timeoutMillis = 5_000) {
             runBlocking(Dispatchers.IO) {
                 itemDao.getAllItems().first().any { it.name == "Mom Birthday" && !it.repeatsYearly }

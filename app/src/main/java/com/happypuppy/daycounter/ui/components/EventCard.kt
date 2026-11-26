@@ -42,6 +42,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -66,6 +67,8 @@ import com.happypuppy.daycounter.ui.theme.LocalEventCardColors
 import com.happypuppy.daycounter.ui.theme.LocalIsDarkTheme
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.isColorBright
+
+internal const val EVENT_CARD_REPEAT_ICON_TAG = "event_card_repeat_icon"
 
 @Composable
 fun EventCard(
@@ -239,6 +242,7 @@ fun EventCard(
                 ) {
                     Text(
                         text = formattedDate,
+                        modifier = Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.bodyMedium,
                         color = secondaryTextColor
                     )
@@ -247,7 +251,9 @@ fun EventCard(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = null,
                             tint = secondaryTextColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier
+                                .size(16.dp)
+                                .testTag(EVENT_CARD_REPEAT_ICON_TAG)
                         )
                     }
                 }
