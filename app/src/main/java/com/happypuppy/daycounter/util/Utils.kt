@@ -87,6 +87,18 @@ fun calculateDaysLeft(
 ): Int = ChronoUnit.DAYS.between(today, targetDate).toInt()
 
 /**
+ * Returns the next occurrence on or after [today] that falls on the month and day of [date].
+ *
+ * Uses [LocalDate.withYear], which clamps Feb 29 to Feb 28 in non-leap years.
+ */
+fun nextYearlyOccurrence(date: LocalDate, today: LocalDate): LocalDate {
+    if (date >= today) return date
+    // LocalDate.withYear clamps Feb 29 to Feb 28 in non-leap years.
+    val thisYear = date.withYear(today.year)
+    return if (thisYear >= today) thisYear else date.withYear(today.year + 1)
+}
+
+/**
  * Converts a [LocalDate] into UTC midnight milliseconds for Material3's `DatePicker`
  * (`initialSelectedDateMillis`).
  */
