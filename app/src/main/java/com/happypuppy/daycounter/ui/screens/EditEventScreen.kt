@@ -35,7 +35,8 @@ fun EditEventScreen(
                         name = state.trimmedName,
                         categoryId = state.selectedCategoryId,
                         targetDate = state.targetDate,
-                        emoji = state.emoji
+                        emoji = state.emoji,
+                        repeatsYearly = state.repeatsYearly
                     )
                 )
             }

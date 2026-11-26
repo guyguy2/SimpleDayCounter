@@ -138,6 +138,7 @@ class EventFormStateTest {
         assertEquals("", defaultState.emoji)
         assertEquals(LocalDate.of(2026, 8, 10), defaultState.targetDate)
         assertEquals(DEFAULT_CATEGORY_ID, defaultState.selectedCategoryId)
+        assertFalse(defaultState.repeatsYearly)
 
         val target = LocalDate.of(2026, 12, 25)
         val item = Item(
@@ -146,13 +147,36 @@ class EventFormStateTest {
             categoryId = "family-uuid",
             createdAt = Date(1_000L),
             targetDate = target,
-            emoji = "\uD83C\uDF89"
+            emoji = "\uD83C\uDF89",
+            repeatsYearly = true
         )
         val fromItem = EventFormState.fromItem(item)
         assertEquals("Holiday", fromItem.name)
         assertEquals("\uD83C\uDF89", fromItem.emoji)
         assertEquals(target, fromItem.targetDate)
         assertEquals("family-uuid", fromItem.selectedCategoryId)
+        assertTrue(fromItem.repeatsYearly)
+    }
+
+    @Test
+    fun `withRepeatsYearly updates flag without changing other fields`() {
+        val initial = EventFormState(
+            name = "Birthday",
+            emoji = "\uD83C\uDF82",
+            targetDate = LocalDate.of(2000, 5, 20),
+            selectedCategoryId = WORK_CATEGORY_ID
+        )
+        assertFalse(initial.repeatsYearly)
+
+        val enabled = initial.withRepeatsYearly(true)
+        assertTrue(enabled.repeatsYearly)
+        assertEquals(initial.name, enabled.name)
+        assertEquals(initial.emoji, enabled.emoji)
+        assertEquals(initial.targetDate, enabled.targetDate)
+        assertEquals(initial.selectedCategoryId, enabled.selectedCategoryId)
+
+        val disabled = enabled.withRepeatsYearly(false)
+        assertFalse(disabled.repeatsYearly)
     }
 
     @Test
@@ -166,7 +190,8 @@ class EventFormStateTest {
             name = "Anniversary",
             emoji = "\u2764\uFE0F",
             targetDate = LocalDate.of(2026, 9, 1),
-            selectedCategoryId = "fitness-uuid"
+            selectedCategoryId = "fitness-uuid",
+            repeatsYearly = true
         )
         assertEquals(populated, roundTrip(populated))
     }
@@ -180,11 +205,25 @@ class EventFormStateTest {
                     name = "Trip",
                     emoji = "\u2708\uFE0F",
                     targetDate = date,
-                    selectedCategoryId = WORK_CATEGORY_ID
+                    selectedCategoryId = WORK_CATEGORY_ID,
+                    repeatsYearly = true
                 )
             )
         } as List<*>
-        assertEquals(listOf("Trip", "\u2708\uFE0F", "2026-09-01", WORK_CATEGORY_ID), saved)
+        assertEquals(listOf("Trip", "\u2708\uFE0F", "2026-09-01", WORK_CATEGORY_ID, true), saved)
+    }
+
+    @Test
+    fun `EventFormStateSaver restores legacy 4-element bundle with repeatsYearly false`() {
+        val restored = EventFormStateSaver.restore(
+            listOf("Birthday", "\uD83C\uDF82", "2026-05-20", DEFAULT_CATEGORY_ID)
+        )
+        assertNotNull(restored)
+        assertEquals("Birthday", restored!!.name)
+        assertEquals("\uD83C\uDF82", restored.emoji)
+        assertEquals(LocalDate.of(2026, 5, 20), restored.targetDate)
+        assertEquals(DEFAULT_CATEGORY_ID, restored.selectedCategoryId)
+        assertFalse(restored.repeatsYearly)
     }
 
     @Test
@@ -194,17 +233,20 @@ class EventFormStateTest {
         assertEquals("", emptyRestored!!.name)
         assertEquals("", emptyRestored.emoji)
         assertEquals(DEFAULT_CATEGORY_ID, emptyRestored.selectedCategoryId)
+        assertFalse(emptyRestored.repeatsYearly)
 
         val shortRestored = EventFormStateSaver.restore(listOf("Partial"))
         assertNotNull(shortRestored)
         assertEquals("Partial", shortRestored!!.name)
         assertEquals("", shortRestored.emoji)
         assertEquals(DEFAULT_CATEGORY_ID, shortRestored.selectedCategoryId)
+        assertFalse(shortRestored.repeatsYearly)
 
-        val wrongTypesRestored = EventFormStateSaver.restore(listOf(42, "ab", "not-a-date", ""))
+        val wrongTypesRestored = EventFormStateSaver.restore(listOf(42, "ab", "not-a-date", "", "invalid-bool"))
         assertNotNull(wrongTypesRestored)
         assertEquals("", wrongTypesRestored!!.name)
         assertEquals("", wrongTypesRestored.emoji)
         assertEquals(DEFAULT_CATEGORY_ID, wrongTypesRestored.selectedCategoryId)
+        assertFalse(wrongTypesRestored.repeatsYearly)
     }
 }

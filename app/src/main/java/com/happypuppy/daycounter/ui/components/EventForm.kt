@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -46,6 +49,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -122,7 +126,8 @@ data class EventFormState(
     val name: String = "",
     val emoji: String = "",
     val targetDate: LocalDate = LocalDate.now(),
-    val selectedCategoryId: String = DEFAULT_CATEGORY_ID
+    val selectedCategoryId: String = DEFAULT_CATEGORY_ID,
+    val repeatsYearly: Boolean = false
 ) {
     val trimmedName: String get() = name.trim()
     val isNameTooLong: Boolean get() = name.length > MAX_EVENT_NAME_LENGTH
@@ -141,12 +146,16 @@ data class EventFormState(
 
     fun withCategoryId(categoryId: String): EventFormState = copy(selectedCategoryId = categoryId)
 
+    fun withRepeatsYearly(repeatsYearly: Boolean): EventFormState =
+        copy(repeatsYearly = repeatsYearly)
+
     companion object {
         fun fromItem(item: Item): EventFormState = EventFormState(
             name = item.name,
             emoji = item.emoji,
             targetDate = item.targetDate,
-            selectedCategoryId = item.categoryId
+            selectedCategoryId = item.categoryId,
+            repeatsYearly = item.repeatsYearly
         )
 
         fun defaultNew(clock: Clock = Clock.systemDefaultZone()): EventFormState = EventFormState(
@@ -165,7 +174,8 @@ val EventFormStateSaver: Saver<EventFormState, Any> = listSaver<EventFormState, 
             state.name,
             state.emoji,
             state.targetDate.toString(),
-            state.selectedCategoryId
+            state.selectedCategoryId,
+            state.repeatsYearly
         )
     },
     restore = { saved ->
@@ -184,11 +194,13 @@ val EventFormStateSaver: Saver<EventFormState, Any> = listSaver<EventFormState, 
         val selectedCategoryId = (saved.getOrNull(3) as? String)
             ?.takeIf { it.isNotBlank() }
             ?: defaults.selectedCategoryId
+        val repeatsYearly = saved.getOrNull(4) as? Boolean ?: defaults.repeatsYearly
         EventFormState(
             name = name,
             emoji = emoji,
             targetDate = targetDate,
-            selectedCategoryId = selectedCategoryId
+            selectedCategoryId = selectedCategoryId,
+            repeatsYearly = repeatsYearly
         )
     }
 )
@@ -345,6 +357,41 @@ fun EventForm(
                     label = { Text(presetLabel) }
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
+                .toggleable(
+                    value = state.repeatsYearly,
+                    onValueChange = { onStateChange(state.withRepeatsYearly(it)) },
+                    role = Role.Switch
+                )
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 16.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.form_repeat_yearly),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = stringResource(R.string.form_repeat_yearly_supporting),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = state.repeatsYearly,
+                onCheckedChange = null
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

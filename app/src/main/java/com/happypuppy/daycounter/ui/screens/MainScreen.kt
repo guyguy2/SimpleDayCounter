@@ -244,7 +244,8 @@ fun MainScreen(
                             name = addFormState.trimmedName,
                             categoryId = addFormState.selectedCategoryId,
                             targetDate = addFormState.targetDate,
-                            emoji = addFormState.emoji
+                            emoji = addFormState.emoji,
+                            repeatsYearly = addFormState.repeatsYearly
                         )
                         showAddEventSheet = false
                         addFormState = EventFormState.defaultNew()
