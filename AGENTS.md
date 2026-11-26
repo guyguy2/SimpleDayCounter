@@ -63,6 +63,21 @@ Tests are mostly JVM unit tests (`app/src/test`, with `isReturnDefaultValues = t
 
 Use the `android` CLI as needed for Android workflows (`android --help` / `android <cmd> --help`) — e.g. `android run` / `install`, `emulator` / `device`, `preview` (render Compose `@Preview`s without a device), `screen` / `layout` / `input`, `analyze` (APK/AAB inspection), `sdk` / `info`, and `docs`.
 
+## Agent Workflow & Tooling
+
+- **Use subagents as needed:** Delegate parallel codebase research, independent code/architecture reviews, or multi-file analysis to subagents to keep the main context focused; pass bounded scope and concrete deliverables.
+- **Use the `android` CLI when needed:** Use `android docs`, `android preview`, `android analyze`, `android emulator`/`device`/`run`/`install`, and `android screen`/`layout`/`input` proactively.
+- **Use the `Pixel_10` emulator for testing as needed:** Run instrumented/accessibility tests and R8-minified signed release smoke tests on `Pixel_10` before shipping. Always pass `-s emulator-NNNN`, never target a personal phone, and use `-read-only` for parallel instances (`5554` Day Counter, `5556` Speech Timer, `5558` Memory Lights).
+- **Always prefer local CI/CD steps over GitHub Actions whenever possible:** Run verification, builds, emulator tests, releases, and promotion locally via `/Users/guy/dev/android/cicd` (`rex/pipeline.lua` and `scripts/local-*.sh`) rather than GitHub Actions.
+
+## Android & UX Best Practices
+
+- **State & lifecycle:** Keep unidirectional data flow with immutable `StateFlow` UI state, pure/testable domain helpers, `rememberSaveable` for transient UI/dialog state, and lifecycle-aware cleanup.
+- **Accessibility & inclusivity:** Ensure interactive targets are at least `48.dp × 48.dp`; never communicate state by color alone (pair with icons, shapes, or text); provide meaningful TalkBack semantics/live regions, WCAG contrast, large font scale (`2.0x`), and reduced-motion (`animator_duration_scale == 0`) support.
+- **Strings & localization:** Keep all user-facing strings, plurals, and content descriptions in `res/values/strings.xml` using XML entities (`&#169;`, `&#8211;`, `&#8230;`); never hardcode user-visible literals or leak raw exception messages into UI.
+- **UI polish & consistency:** Use Material 3 color roles and typography cleanly, edge-to-edge insets without system-bar clipping, adaptive layouts across portrait/landscape/tablets, and dynamic `AppVersionInfo` (`PackageManager`) in the About dialog.
+- **Quality, R8 & Play readiness:** Keep JVM unit tests fast and deterministic; maintain explicit `app/proguard-rules.pro` keep rules and smoke-test signed R8-minified release builds on `Pixel_10`; enforce `targetSdk >= 36`, 16 KB ELF alignment, `ndk.debugSymbolLevel = "SYMBOL_TABLE"`, and clean semantic `versionName` (never commit hashes).
+
 ## Architecture
 
 - **DI**: Koin, started in `MainApp`. All bindings live in `di/AppModule.kt` (`AppDatabase`, `ItemDao`, `ItemRepository`, `Clock`, `DataStoreManager`, `EventListPreferences`, and `EventViewModel(repository, listPreferences, clock, midnightDateFlow(clock))`). `app/proguard-rules.pro` explicitly keeps `di.**`, `EventViewModel`, `data.database.**`, `DateConverters`, and `navigation.**` (including `kotlinx.serialization` serializers) for R8 — update it if you add new ViewModels, Room `TypeConverter`s, or `@Serializable` routes. `MainScreen` is split into stateful `MainScreen` (Koin-injected) and stateless `MainScreenContent` (zero Koin, with `@Preview`s); `MainActivity`, `SettingsScreen`, and `CategoryManagementScreen` still call `koinInject` directly, so Compose previews of those need a Koin context.
@@ -119,14 +134,16 @@ Use the `android` CLI as needed for Android workflows (`android --help` / `andro
 
 ## Release and CI/CD (linked repos)
 
-This repo does not hold the release tooling. The shared CI/CD hub is a separate local git repo:
+This repo does not hold the release tooling. **Always prefer local CI/CD steps (`rex/pipeline.lua` + `scripts/local-*.sh`) over GitHub Actions whenever possible.** The shared CI/CD hub is a separate local git repo:
 
-- CI/CD hub: `/Users/guy/dev/android/cicd` (GCP project `happypuppy-play-cicd`, service accounts `play-ci-testing` and `play-ci-production`, keyless WIF auth). Read before any release work:
+- CI/CD hub: `/Users/guy/dev/android/cicd` (GCP project `happypuppy-play-cicd`, service accounts `play-ci-testing` and `play-ci-production`, keyless WIF / `gcloud` ADC auth). Read before any release work:
   - `cicd/app-state.md`: living source of truth (per-app Play state, package names, keystore locations and aliases, what is live on which track).
   - `cicd/workflows/existing-app-onboard-and-release.md`: the repeatable release checklist.
   - `cicd/14-local-and-self-hosted-pipelines.md`: running the CI, release and promote workflows locally.
-  - `cicd/release-log.md`: history and lessons. `cicd/AGENTS.md`: workspace rule, `versionName` is always clean semver, never a commit hash.
-- Sibling app on the same pipeline: SpeechTimer_Jetpack (Simple Speech Timer, package com.happypuppy.toastmasterstimer) at /Users/guy/dev/android/SpeechTimer_Jetpack; same hub, same release workflows, its AGENTS.md points back here and to the hub
+  - `cicd/release-log.md`: history and lessons. `cicd/AGENTS.md`: workspace rules (clean semver `versionName`, local-first CI/CD policy).
+- Sibling apps on the same pipeline:
+  - `SpeechTimer_Jetpack` (Simple Speech Timer, package `com.happypuppy.toastmasterstimer`, alias `speechtimer`) at `/Users/guy/dev/android/SpeechTimer_Jetpack`
+  - `MemoryLights` (Memory Lights, package `com.happypuppy.memorylights`, alias `memorylights`) at `/Users/guy/dev/android/MemoryLights`
 - This repo's own workflows are `.github/workflows/ci.yml`, `release-internal.yml` and `promote.yml` (SHA-pinned). Local mirrors live in the hub and take this repo via `--repo-dir`; run them from the hub directory:
 
 ```bash
