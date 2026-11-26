@@ -10,8 +10,8 @@ import com.happypuppy.daycounter.data.database.Item
 import com.happypuppy.daycounter.util.DayLabel
 import com.happypuppy.daycounter.util.calculateDaysLeft
 import com.happypuppy.daycounter.util.dayLabelFor
+import com.happypuppy.daycounter.util.nextYearlyOccurrence
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 data class EventUi(
     val id: Int,
@@ -23,7 +23,9 @@ data class EventUi(
     val dayLabel: DayLabel,
     val emoji: String,
     val createdAtMillis: Long,
-    val restoreVersion: Int = 0
+    val restoreVersion: Int = 0,
+    val repeatsYearly: Boolean = false,
+    val years: Int = 0
 )
 
 fun Item.toEventUi(
@@ -32,18 +34,26 @@ fun Item.toEventUi(
     restoreVersion: Int = 0
 ): EventUi {
     val resolvedCategory = categoriesById[categoryId] ?: DEFAULT_CATEGORIES.first()
-    val daysLeft = ChronoUnit.DAYS.between(today, targetDate).toInt()
+    val effectiveDate = if (repeatsYearly) nextYearlyOccurrence(targetDate, today) else targetDate
+    val years = if (repeatsYearly && targetDate.isBefore(today)) {
+        effectiveDate.year - targetDate.year
+    } else {
+        0
+    }
+    val daysLeft = calculateDaysLeft(effectiveDate, today)
     return EventUi(
         id = id,
         name = name,
         categoryId = resolvedCategory.id,
         categoryName = resolvedCategory.name,
-        targetDate = targetDate,
+        targetDate = effectiveDate,
         daysLeft = daysLeft,
         dayLabel = dayLabelFor(daysLeft),
         emoji = emoji,
         createdAtMillis = createdAt.time,
-        restoreVersion = restoreVersion
+        restoreVersion = restoreVersion,
+        repeatsYearly = repeatsYearly,
+        years = years
     )
 }
 
