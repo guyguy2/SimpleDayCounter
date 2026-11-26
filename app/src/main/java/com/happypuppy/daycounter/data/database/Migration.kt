@@ -107,3 +107,9 @@ fun migration4To5(zoneId: ZoneId = ZoneId.systemDefault()): Migration = object :
 }
 
 val MIGRATION_4_5: Migration = migration4To5()
+
+val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `items` ADD COLUMN `repeats_yearly` INTEGER NOT NULL DEFAULT 0")
+    }
+}
